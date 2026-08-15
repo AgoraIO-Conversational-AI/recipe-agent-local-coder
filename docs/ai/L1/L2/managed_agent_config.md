@@ -137,7 +137,7 @@ Stop is idempotent: `Agent.stop` tries `session.stop()` on the in-memory session
 
 ## Verification
 
-`bun run verify:backend` runs `py_compile` so syntax errors surface, but it does not exercise behavior. `bun run verify:local:fastapi` runs the FastAPI app with `FakeAgent` patched in to ensure routes match expected shapes without touching the real Agora cloud.
+`bun run verify:backend` compiles server source and runs the credential-free architecture-validation tests, but it does not call live Agora. `bun run verify:local:fastapi` runs the FastAPI app with `FakeAgent` patched in to ensure routes match expected shapes without touching the real Agora cloud.
 
 After editing `agent.py`, run:
 

@@ -118,3 +118,20 @@ async def test_sessions_are_isolated(store):
 
     assert await store.current_permission("session-a") == permission_a
     assert await store.current_permission("session-b") == permission_b
+
+
+@pytest.mark.anyio
+async def test_reconnect_rebind_preserves_permission_identity(store):
+    pending = await store.seed_permission(
+        session_id="session-a",
+        question="Allow A?",
+        operation="operation_a",
+    )
+
+    await store.rebind_session("session-a", "session-b")
+
+    rebound = await store.current_permission("session-b")
+    assert await store.current_permission("session-a") is None
+    assert rebound is not None
+    assert rebound.authorization_id == pending.authorization_id
+    assert rebound.version == pending.version

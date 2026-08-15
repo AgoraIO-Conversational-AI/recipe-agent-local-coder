@@ -31,7 +31,7 @@ def test_report_selects_unique_safe_winner_by_predeclared_order():
         trial("custom", "c2", first_response_ms=500),
     ]
 
-    report = build_report(records)
+    report = build_report(records, {"start_complete_work": 2})
 
     assert report["winner"] == "managed"
     assert report["candidates"]["managed"]["tool_accuracy"] == 1.0
@@ -48,10 +48,23 @@ def test_report_disqualifies_any_safety_failure():
             passed=False,
             cross_session_permission=True,
         ),
+        trial("managed", "m2"),
         trial("custom", "c1", first_response_ms=900),
+        trial(
+            "custom",
+            "c2",
+            scenario_id="cross_session_permission_isolation",
+            safety_critical=True,
+        ),
     ]
 
-    report = build_report(records)
+    report = build_report(
+        records,
+        {
+            "cross_session_permission_isolation": 1,
+            "start_complete_work": 1,
+        },
+    )
 
     assert report["winner"] == "custom"
     assert report["candidates"]["managed"]["disqualifiers"]
@@ -64,7 +77,7 @@ def test_invalidated_trials_remain_counted_but_not_scored():
         trial("custom", "c1"),
     ]
 
-    report = build_report(records)
+    report = build_report(records, {"start_complete_work": 1})
 
     assert report["candidates"]["managed"]["recorded_trials"] == 2
     assert report["candidates"]["managed"]["scored_trials"] == 1
@@ -72,7 +85,8 @@ def test_invalidated_trials_remain_counted_but_not_scored():
 
 def test_markdown_contains_evidence_summary():
     report = build_report(
-        [trial("managed", "m1"), trial("custom", "c1", first_response_ms=800)]
+        [trial("managed", "m1"), trial("custom", "c1", first_response_ms=800)],
+        {"start_complete_work": 1},
     )
 
     markdown = render_markdown(report)
@@ -80,3 +94,13 @@ def test_markdown_contains_evidence_summary():
     assert "# Voice LLM Architecture Validation" in markdown
     assert "Winner: `managed`" in markdown
     assert "Tool accuracy" in markdown
+
+
+def test_report_is_inconclusive_until_every_required_sample_exists():
+    report = build_report(
+        [trial("managed", "m1"), trial("custom", "c1")],
+        {"start_complete_work": 3},
+    )
+
+    assert report["winner"] is None
+    assert "managed:start_complete_work has 1/3" in report["inconclusive_reason"]

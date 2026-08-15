@@ -6,7 +6,7 @@
 
 | Layer                    | Script / Tool                                | Bun target                | What it asserts                                              |
 | ------------------------ | -------------------------------------------- | ------------------------- | ------------------------------------------------------------ |
-| Python compile           | `py_compile` over `server/src/*.py`          | `bun run verify:backend`  | Python source is syntactically valid                          |
+| Python compile + unit    | `compileall` + validation pytest             | `bun run verify:backend`  | Python source compiles and validation behavior passes         |
 | Web → Rewrite contract   | `web/scripts/verify-api-contracts.ts`        | `bun run verify:web:api`  | No `app/api` routes; `/api/*` rewrites + fetch shapes correct |
 | Web → rewrite stub       | `web/scripts/verify-local-proxy.ts`          | `bun run verify:web:proxy`| Imports `next.config.ts`, resolves rewrites, fetches an in-process stub directly |
 | Web → FastAPI + FakeAgent| `web/scripts/verify-local-fastapi.ts`        | `bun run verify:local:fastapi` | Spawns FastAPI with `FakeAgent` patched in              |
@@ -60,9 +60,9 @@ What it does:
 
 This is the closest CI gets to a full integration test. It never makes outbound calls.
 
-## `py_compile` Verification
+## Python Compile and Validation Tests
 
-`bun run verify:backend` runs `python3 -m py_compile server/src/server.py server/src/agent.py`. It catches:
+`bun run verify:backend` compiles `server/src/` and runs the credential-free tests under `server/tests/architecture_validation/`. It catches:
 
 - Syntax errors.
 

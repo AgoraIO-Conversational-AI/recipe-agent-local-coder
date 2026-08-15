@@ -109,7 +109,7 @@ server/                   # Python FastAPI backend
 
 - **No `web/src/hooks/`** and **no `useAgoraConnection.ts`** — RTC/RTM orchestration lives in `LandingPage.tsx` and `ConversationComponent.tsx`.
 - **No `pyproject.toml`** — Python deps are pip + `requirements.txt`.
-- **No `tests/` directory** — Python verification is `py_compile` plus the bun-spawned smoke scripts.
+- **`server/tests/architecture_validation/`** — pytest coverage for the temporary Voice LLM comparison; ordinary backend routes still use the bun-spawned smoke scripts.
 - **No `Makefile`** — `bun run …` is the canonical entry point.
 - **No `app/api/**/route.ts`** under `web/` — `verify-api-contracts.ts` enforces this.
 

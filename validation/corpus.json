@@ -92,6 +92,12 @@
     {
       "id": "reconnect_with_permission",
       "category": "reconnect",
+      "operator_actions": [
+        {
+          "timing": "before_turns",
+          "instruction": "Disconnect the browser voice session, reconnect it, and wait for the new agent session to become ready."
+        }
+      ],
       "turns": ["I am back. Allow the test command you just asked about."],
       "expected_tools": [{"name": "respond_permission", "arguments": {"decision": "allow"}, "count": 1}],
       "forbidden_tools": ["start_work"],
@@ -100,6 +106,12 @@
     {
       "id": "interrupt_permission_question",
       "category": "interruption",
+      "operator_actions": [
+        {
+          "timing": "during_turns",
+          "instruction": "Begin saying the trial utterance while the agent is still speaking the permission question."
+        }
+      ],
       "turns": ["Allow it."],
       "expected_tools": [{"name": "respond_permission", "arguments": {"decision": "allow"}, "count": 1}],
       "forbidden_tools": ["start_work"],

@@ -262,3 +262,24 @@ class ValidationStateStore:
                 for observation in self._observations
                 if observation.session_id != session_id
             ]
+
+    async def rebind_session(self, old_session_id: str, new_session_id: str) -> None:
+        """Move synthetic runtime state to a reconnected voice session."""
+        if old_session_id == new_session_id:
+            return
+        async with self._lock:
+            if new_session_id in self._permissions or new_session_id in self._works:
+                raise ValueError("new session already has validation state")
+            pending = self._permissions.pop(old_session_id, None)
+            if pending is not None:
+                self._permissions[new_session_id] = replace(
+                    pending, session_id=new_session_id
+                )
+                self._versions[new_session_id] = max(
+                    self._versions.get(new_session_id, 0), pending.version
+                )
+            works = self._works.pop(old_session_id, [])
+            if works:
+                self._works[new_session_id] = [
+                    replace(work, session_id=new_session_id) for work in works
+                ]

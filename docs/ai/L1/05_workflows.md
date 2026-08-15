@@ -41,7 +41,7 @@ After editing, run `bun run verify:backend && bun run verify:web:api`.
 ```bash
 bun run doctor              # quick gate
 bun run doctor:local        # adds python3 + env checks
-bun run verify:backend      # py_compile sanity
+bun run verify:backend      # Python compile + architecture-validation pytest
 bun run verify:web:api      # contract harness on the rewrite shape
 bun run verify:web:proxy    # static fake-server smoke
 bun run verify:local:fastapi # spawns FakeAgent inside FastAPI

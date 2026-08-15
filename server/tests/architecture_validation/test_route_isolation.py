@@ -61,9 +61,7 @@ def test_public_surface_has_no_loopback_or_lifecycle_routes():
 def test_admin_seed_route_rejects_non_loopback_client():
     app = FastAPI()
     app.include_router(
-        build_admin_router(
-            store=ValidationStateStore(), registry=CapabilityRegistry()
-        )
+        build_admin_router(store=ValidationStateStore())
     )
 
     with TestClient(app, client=("203.0.113.10", 50000)) as client:

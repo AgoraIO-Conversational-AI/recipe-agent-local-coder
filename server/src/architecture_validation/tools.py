@@ -12,7 +12,11 @@ class ValidationTools:
         self._store = store
 
     async def _observe(
-        self, binding: RuntimeSessionBinding, name: str, arguments: dict[str, object]
+        self,
+        binding: RuntimeSessionBinding,
+        name: str,
+        arguments: dict[str, object],
+        result: dict[str, object],
     ) -> None:
         bounded = {
             key: value[:512] if isinstance(value, str) else value
@@ -24,6 +28,7 @@ class ValidationTools:
                 session_id=binding.session_id,
                 name=name,
                 arguments=bounded,
+                result=result,
                 observed_at=datetime.now(timezone.utc),
             )
         )
@@ -41,73 +46,83 @@ class ValidationTools:
             raise ValueError("objective is required")
         if not idempotency_key:
             raise ValueError("idempotency_key is required")
-        await self._observe(
-            binding,
-            "start_work",
-            {"objective": objective, "idempotency_key": idempotency_key},
-        )
         code, work = await self._store.accept_work(
             session_id=binding.session_id,
             objective=objective,
             idempotency_key=idempotency_key,
         )
         if work is None:
-            return {"code": code}
-        return {"code": code, "work_id": work.work_id, "state": work.state}
+            response: dict[str, object] = {"code": code}
+        else:
+            response = {"code": code, "work_id": work.work_id, "state": work.state}
+        await self._observe(
+            binding,
+            "start_work",
+            {"objective": objective, "idempotency_key": idempotency_key},
+            response,
+        )
+        return response
 
     async def get_work_status(
         self, *, binding: RuntimeSessionBinding, work_id: Optional[str] = None
     ) -> dict[str, object]:
-        await self._observe(binding, "get_work_status", {"work_id": work_id})
         work = await self._store.find_work(
             session_id=binding.session_id, work_id=work_id
         )
         if work is None:
-            return {"code": "work_not_found"}
-        return {
-            "code": "work_found",
-            "work_id": work.work_id,
-            "state": work.state,
-            "objective": work.objective,
-        }
+            response: dict[str, object] = {"code": "work_not_found"}
+        else:
+            response = {
+                "code": "work_found",
+                "work_id": work.work_id,
+                "state": work.state,
+                "objective": work.objective,
+            }
+        await self._observe(
+            binding, "get_work_status", {"work_id": work_id}, response
+        )
+        return response
 
     async def cancel_work(
         self, *, binding: RuntimeSessionBinding, work_id: Optional[str] = None
     ) -> dict[str, object]:
-        await self._observe(binding, "cancel_work", {"work_id": work_id})
         work = await self._store.cancel_work(
             session_id=binding.session_id, work_id=work_id
         )
         if work is None:
-            return {"code": "work_not_found"}
-        return {
-            "code": "work_cancelled",
-            "work_id": work.work_id,
-            "state": work.state,
-        }
+            response: dict[str, object] = {"code": "work_not_found"}
+        else:
+            response = {
+                "code": "work_cancelled",
+                "work_id": work.work_id,
+                "state": work.state,
+            }
+        await self._observe(binding, "cancel_work", {"work_id": work_id}, response)
+        return response
 
     async def respond_permission(
         self, *, binding: RuntimeSessionBinding, decision: PermissionDecision
     ) -> dict[str, object]:
         if decision not in ("allow", "reject"):
             raise ValueError("decision must be allow or reject")
-        await self._observe(
-            binding, "respond_permission", {"decision": decision}
-        )
         pending = await self._store.current_permission(binding.session_id)
         if pending is None:
-            return {"code": "permission_not_found"}
-        result = await self._store.resolve_permission(
-            session_id=binding.session_id,
-            authorization_id=pending.authorization_id,
-            version=pending.version,
-            decision=decision,
+            response: dict[str, object] = {"code": "permission_not_found"}
+        else:
+            result = await self._store.resolve_permission(
+                session_id=binding.session_id,
+                authorization_id=pending.authorization_id,
+                version=pending.version,
+                decision=decision,
+            )
+            response = {"code": result.code}
+            if result.authorization_id is not None:
+                response["authorization_id"] = result.authorization_id
+            if result.version is not None:
+                response["version"] = result.version
+            if result.decision is not None:
+                response["decision"] = result.decision
+        await self._observe(
+            binding, "respond_permission", {"decision": decision}, response
         )
-        response: dict[str, object] = {"code": result.code}
-        if result.authorization_id is not None:
-            response["authorization_id"] = result.authorization_id
-        if result.version is not None:
-            response["version"] = result.version
-        if result.decision is not None:
-            response["decision"] = result.decision
         return response

@@ -52,10 +52,12 @@ bun run validate:managed
 bun run dev:frontend
 ```
 
-Complete the prompted trials, then repeat with `bun run validate:custom`. The runner resumes completed trial IDs and never overwrites evidence. After both paths finish:
+Complete the prompted trials, including the explicit reconnect and speech-interruption actions, then repeat with `bun run validate:custom`. A reconnect trial is accepted only after the browser creates a new Agora agent session; the harness rebinds the same synthetic pending permission to that session before the reply. The runner resumes completed trial IDs and never overwrites evidence. An invalidated setup attempt requires a reason, remains in raw evidence, and is rerun. After both paths finish:
 
 ```bash
 bun run validate:report
 ```
 
 Raw JSONL and rendered reports remain under `validation/results/` and are gitignored. Stop the frontend, runner, and ngrok when finished. The validation harness is not a production runtime.
+
+The report remains inconclusive until each path has at least three scored runs of every ordinary scenario and ten scored runs of every safety-critical scenario. A partial matrix can never select a winner.

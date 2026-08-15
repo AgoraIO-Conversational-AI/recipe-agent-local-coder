@@ -276,3 +276,12 @@ class Agent:
 
         logger.info("Stopping Agora agent through client.stop_agent agent_id=%s", agent_id)
         await self.client.stop_agent(agent_id)
+
+    def active_validation_session(
+        self,
+    ) -> tuple[str, RuntimeSessionBinding, Any] | None:
+        """Return the latest active session for the local validation runner."""
+        if not self._bindings:
+            return None
+        agent_id = next(reversed(self._bindings))
+        return agent_id, self._bindings[agent_id], self._sessions[agent_id]

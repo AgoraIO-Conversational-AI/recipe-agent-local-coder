@@ -34,6 +34,7 @@ class ToolObservation:
     session_id: str
     name: str
     arguments: dict[str, object]
+    result: dict[str, object]
     observed_at: datetime
 
 

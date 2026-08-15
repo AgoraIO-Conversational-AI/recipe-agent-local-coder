@@ -85,7 +85,7 @@ bun run doctor:local           # adds python3 + .env.local + AGORA_* presence
 bun run build                  # bun --filter web build
 bun run verify                 # doctor + verify:web:api + verify:web:build
 bun run verify:local           # doctor:local + verify:backend + verify:local:fastapi + verify:web:proxy + verify:web:build
-bun run verify:backend         # py_compile of server/src/*.py
+bun run verify:backend         # compile server/src and run architecture-validation pytest
 bun run verify:web:api         # web/scripts/verify-api-contracts.ts
 bun run verify:web:proxy       # web/scripts/verify-local-proxy.ts
 bun run verify:local:fastapi   # spawns server/scripts/run_fake_server.py
@@ -106,7 +106,7 @@ bun run validate:report        # local redacted decision report
 | `bun run verify:web:api`      | No          | Contract harness with mocked SDK                     |
 | `bun run verify:web:proxy`    | No          | Static fake-server smoke                             |
 | `bun run verify:local:fastapi`| No          | Boots `server/scripts/run_fake_server.py`            |
-| `bun run verify:backend`      | No          | `py_compile` over server sources                     |
+| `bun run verify:backend`      | No          | Compile server sources + architecture-validation pytest |
 | `bun run verify:web:build`    | No          | `bun --filter web build`                             |
 | `bun run dev`                 | Yes (for use) | Port binding blocked in many sandboxes              |
 

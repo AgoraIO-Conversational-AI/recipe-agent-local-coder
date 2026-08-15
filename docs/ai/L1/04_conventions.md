@@ -7,7 +7,7 @@
 | Concern        | Toolchain                                                                              |
 | -------------- | -------------------------------------------------------------------------------------- |
 | Python format  | None enforced in-repo. Match existing style; `ruff`/`black` are not configured.        |
-| Python verify  | `py_compile` over `server/src/*.py` (`bun run verify:backend`).                        |
+| Python verify  | Compile `server/src/` and run architecture-validation pytest (`bun run verify:backend`). |
 | Python deps    | `pip install -r server/requirements.txt` inside `server/venv` (created by `bun run setup:backend`). |
 | TypeScript     | `strict: true` in `web/tsconfig.json`; path alias `@/* → ./src/*`.                     |
 | Linter         | Biome (`web/biome.json`); `noExplicitAny` off, `useExhaustiveDependencies` off.        |
@@ -21,7 +21,7 @@ There is **no ESLint config file** in `web/` — Biome is the only TS/JS linter.
 - `Agent` is a class with `async def start(...)` and `async def stop(...)`. Routes call `await agent.start(...)` directly.
 - The FastAPI `agent` instance is created once at module scope (`agent = Agent()`). `Agent.__init__` reads env via `os.environ`. Recreating `Agent` per request would be wasteful and is intentionally avoided.
 - `Agent` is **not stateless**: it holds `self._sessions: Dict[str, Any]` keyed by `agent_id` for the lifetime of the worker. Per-request data still lives in pydantic models and locals; only cross-call session bookkeeping belongs on `self`.
-- If `Agent()` fails during module load (missing env after imports succeed), the module exports `agent = None` and route handlers return `500`. `verify:backend` only compiles source; use `verify:local:fastapi` or `bun run dev` to exercise imports and startup behavior.
+- If `Agent()` fails during module load (missing env after imports succeed), the module exports `agent = None` and route handlers return `500`. `verify:backend` does not call live Agora; use `verify:local:fastapi` or `bun run dev` to exercise route startup behavior.
 - Errors are raised, not returned as tuples. `_to_http_error` in `server.py` maps `ValueError` → `400`, `RuntimeError` → `500`, anything else → `500`.
 - Logging: `logging.getLogger("uvicorn.error")`. There is no custom logger.
 - Type hints are used for pydantic models (`StartAgentRequest`, `StopAgentRequest`) and `Agent` method signatures.
@@ -59,9 +59,9 @@ There is **no ESLint config file** in `web/` — Biome is the only TS/JS linter.
 
 ## Testing
 
-- Python: no pytest harness today. `bun run verify:backend` runs `py_compile` so syntax regressions surface; it does not execute imports or catch runtime SDK/env failures.
+- Python: `server/tests/architecture_validation/` uses pytest for the temporary comparison harness. `bun run verify:backend` runs that suite after `py_compile`; ordinary backend route coverage still comes from the smoke scripts.
 - TS: no Vitest harness. The verification suite has **four layers** (see `docs/ai/L1/L2/verification_scripts.md`): Python compile, contract harness (`verify-api-contracts.ts`), rewrite stub (`verify-local-proxy.ts`), and FakeAgent FastAPI smoke (`verify-local-fastapi.ts`). The `verify:web:build` step rounds them out.
-- Add Python tests under `server/tests/` if you introduce them; nothing currently imports from such a path.
+- Keep architecture-validation Python tests under `server/tests/architecture_validation/` and run them without live Agora or model credentials.
 
 ## File Naming
 

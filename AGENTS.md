@@ -25,7 +25,7 @@ The sections below (Start Here, Patterns, Anti-Patterns, etc.) remain the canoni
 - Backend: Python FastAPI in `server`
 - Web API facade: Next rewrites in `web/next.config.ts`
 - Auth: Token007 generated from `AGORA_APP_ID` and `AGORA_APP_CERTIFICATE`
-- Default agent config: managed Deepgram STT, OpenAI LLM, and MiniMax TTS
+- Current derivative config: managed Deepgram STT and MiniMax TTS around a bounded Managed-vs-Custom Voice LLM validation path
 
 ## Supported Modes
 
@@ -34,6 +34,13 @@ The sections below (Start Here, Patterns, Anti-Patterns, etc.) remain the canoni
 - Run from the repo root with `bun run dev`.
 - Root scripts start FastAPI on `http://localhost:8000` and Next.js on `http://localhost:3000`.
 - The web app calls `/api/*`; Next rewrites those requests to the Python service through `AGENT_BACKEND_URL=http://localhost:8000`.
+
+### Voice LLM Architecture Validation
+
+- Use `bun run validate:managed` and `bun run validate:custom` only for the bounded macOS comparison documented in `validation/README.md`.
+- Expose only local port 8001 through ngrok. Port 8000, lifecycle routes, admin routes, and reports stay loopback-only.
+- Keep both candidates on the same corpus controls and shared MCP tools. Raw evidence stays local, and a partial sample matrix must remain inconclusive.
+- This harness does not implement ACP, Codex execution, or the production Task Runtime.
 
 ### Deployment
 
@@ -66,6 +73,7 @@ The sections below (Start Here, Patterns, Anti-Patterns, etc.) remain the canoni
 - Keep RTC client creation StrictMode-safe.
 - Keep transcript speaker mapping based on actual UIDs, not heuristics.
 - Keep managed-provider defaults unless a change intentionally adds a custom provider path.
+- Keep validation-only provider branching inside the bounded architecture-validation workflow; remove the losing adapter after the measured decision.
 
 ## Working Rules
 

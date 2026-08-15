@@ -3,7 +3,7 @@
 from fastapi import APIRouter, HTTPException, Request
 from pydantic import BaseModel
 
-from .state import CapabilityRegistry, ValidationStateStore
+from .state import ValidationStateStore
 
 
 class SeedPermissionRequest(BaseModel):
@@ -18,9 +18,7 @@ def _require_loopback(request: Request) -> None:
         raise HTTPException(status_code=403, detail="loopback access required")
 
 
-def build_admin_router(
-    *, store: ValidationStateStore, registry: CapabilityRegistry
-) -> APIRouter:
+def build_admin_router(*, store: ValidationStateStore) -> APIRouter:
     router = APIRouter(prefix="/validation/admin", include_in_schema=False)
 
     @router.post("/permissions")

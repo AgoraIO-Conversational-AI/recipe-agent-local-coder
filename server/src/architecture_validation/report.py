@@ -6,6 +6,7 @@ import math
 from pathlib import Path
 from typing import Any, Iterable
 
+from .config import CORPUS_PATH
 from .scoring import (
     CandidateScore,
     InconclusiveValidation,
@@ -17,6 +18,14 @@ from .scoring import (
 
 REPO_ROOT = Path(__file__).parents[3]
 RESULTS_DIR = REPO_ROOT / "validation" / "results"
+
+
+def required_sample_counts() -> dict[str, int]:
+    corpus = json.loads(CORPUS_PATH.read_text(encoding="utf-8"))
+    return {
+        scenario["id"]: 10 if scenario["safety_critical"] else 3
+        for scenario in corpus["scenarios"]
+    }
 
 
 def _p95(values: list[float]) -> float:
@@ -60,6 +69,11 @@ def _candidate_summary(path: str, records: list[dict[str, Any]]) -> dict[str, An
         for record in scored
         if record.get("first_response_ms") is not None
     ]
+    route_checks = [
+        check
+        for record in scored
+        for check in record.get("route_isolation", [])
+    ]
     return {
         "path": path,
         "recorded_trials": len(records),
@@ -75,6 +89,18 @@ def _candidate_summary(path: str, records: list[dict[str, Any]]) -> dict[str, An
         ),
         "p95_first_response_ms": _p95(latencies),
         "failure_rate": failure_rate,
+        "required_secrets": (
+            ["AGORA_APP_ID", "AGORA_APP_CERTIFICATE"]
+            if path == "managed"
+            else [
+                "AGORA_APP_ID",
+                "AGORA_APP_CERTIFICATE",
+                "MODEL_PROVIDER_API_KEY",
+            ]
+        ),
+        "route_isolation_passed": bool(route_checks) and all(
+            check.get("passed") for check in route_checks
+        ),
         "scenario_results": {
             scenario_id: {
                 "passed": sum(
@@ -93,8 +119,12 @@ def _candidate_summary(path: str, records: list[dict[str, Any]]) -> dict[str, An
     }
 
 
-def build_report(records: Iterable[dict[str, Any]]) -> dict[str, Any]:
+def build_report(
+    records: Iterable[dict[str, Any]],
+    required_counts: dict[str, int] | None = None,
+) -> dict[str, Any]:
     records = list(records)
+    required_counts = required_counts or required_sample_counts()
     candidates = {
         path: _candidate_summary(
             path, [record for record in records if record.get("path") == path]
@@ -112,9 +142,19 @@ def build_report(records: Iterable[dict[str, Any]]) -> dict[str, Any]:
         )
         for summary in candidates.values()
     ]
-    if any(item["scored_trials"] == 0 for item in candidates.values()):
+    incomplete = []
+    for path, summary in candidates.items():
+        for scenario_id, required in required_counts.items():
+            observed = summary["scenario_results"].get(
+                scenario_id, {"total": 0}
+            )["total"]
+            if observed < required:
+                incomplete.append(
+                    f"{path}:{scenario_id} has {observed}/{required} scored trials"
+                )
+    if incomplete:
         winner = None
-        inconclusive_reason = "both candidates require scored live trials"
+        inconclusive_reason = "incomplete live matrix: " + "; ".join(incomplete)
     else:
         try:
             winner = select_winner(scores)
@@ -127,6 +167,13 @@ def build_report(records: Iterable[dict[str, Any]]) -> dict[str, Any]:
         "corpus_version": records[0].get("corpus_version") if records else None,
         "model_control": records[0].get("model_control") if records else None,
         "environment": records[0].get("environment") if records else None,
+        "upstream_quickstart_commit": (
+            records[0].get("upstream_quickstart_commit") if records else None
+        ),
+        "custom_recipe_reference_commit": (
+            records[0].get("custom_recipe_reference_commit") if records else None
+        ),
+        "required_sample_counts": required_counts,
         "winner": winner,
         "inconclusive_reason": inconclusive_reason,
         "candidates": candidates,
@@ -144,6 +191,10 @@ def render_markdown(report: dict[str, Any]) -> str:
         "",
         winner,
         "",
+        f"Corpus: `{report['corpus_version'] or 'unknown'}`",
+        f"Upstream quickstart: `{report['upstream_quickstart_commit'] or 'unknown'}`",
+        f"Custom LLM recipe reference: `{report['custom_recipe_reference_commit'] or 'unknown'}`",
+        "",
         "| Candidate | Scored trials | Tool accuracy | Failure rate | p95 first response | Configuration steps | Disqualifiers |",
         "| --- | ---: | ---: | ---: | ---: | ---: | --- |",
     ]
@@ -160,6 +211,16 @@ def render_markdown(report: dict[str, Any]) -> str:
                 steps=item["configuration_steps"],
                 disqualifiers=", ".join(item["disqualifiers"]) or "None",
             )
+        )
+    lines.extend(["", "## Controls", "", "```json"])
+    lines.append(json.dumps(report.get("model_control"), indent=2, sort_keys=True))
+    lines.extend(["```", "", "## Public ingress", ""])
+    for path in ("managed", "custom"):
+        item = report["candidates"][path]
+        lines.append(
+            f"- `{path}` route isolation: "
+            f"{'passed' if item['route_isolation_passed'] else 'not proven'}; "
+            f"required secrets: {', '.join(item['required_secrets'])}."
         )
     return "\n".join(lines) + "\n"
 
