@@ -64,6 +64,8 @@ server/                   # Python FastAPI backend
     agent.py              # Agent class: start, stop, vendor chain
     architecture_validation/
       admin.py            # Loopback-only state seeding
+      context.py          # Shared bounded permission projection
+      managed.py          # Agent-session update and APPEND speech adapter
       mcp_app.py          # Authenticated FastMCP tool surface
       public_server.py    # Minimal public ASGI app factory
       runtime.py          # Process-local shared state

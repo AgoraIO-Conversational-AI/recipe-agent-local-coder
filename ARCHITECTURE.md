@@ -83,6 +83,8 @@ Agora Cloud -> ngrok -> public ASGI:8001 -> authenticated /mcp only
 
 The live runner must own both listeners in one process. Running the public app separately would create another in-memory capability registry and is unsupported. The four MCP tools operate on synthetic receipts only; they do not start ACP, coding agents, commands, or file operations.
 
+For the Managed candidate, the existing authenticated Agent session replaces the complete `llm.system_messages` list with the base prompt plus at most one bounded current permission. The same session announces the question with one `say(..., priority="APPEND", interruptable=True)` call. No separate Agora REST credentials are required.
+
 ## Detailed Documentation
 
 - [docs/ai/L1/02_architecture.md](./docs/ai/L1/02_architecture.md) — web ↔ FastAPI topology, rewrites, lifecycle
