@@ -5,14 +5,81 @@ This store is intentionally not the production Task Runtime or Work Store.
 
 import asyncio
 import secrets
-from datetime import datetime, timezone
+import threading
+from dataclasses import replace
+from datetime import datetime, timedelta, timezone
 from typing import Optional
 
 from .models import (
     PendingPermission,
     PermissionDecision,
     PermissionResolution,
+    RuntimeSessionBinding,
+    SyntheticWork,
+    ToolObservation,
 )
+
+
+class CapabilityRegistry:
+    """Map unguessable per-session capabilities to trusted local bindings."""
+
+    def __init__(self) -> None:
+        self._lock = threading.RLock()
+        self._mcp: dict[str, RuntimeSessionBinding] = {}
+        self._llm: dict[str, RuntimeSessionBinding] = {}
+
+    def issue_sync(
+        self, *, session_id: str, scenario_id: str, ttl_seconds: int = 3600
+    ) -> RuntimeSessionBinding:
+        if not session_id.strip() or not scenario_id.strip():
+            raise ValueError("session_id and scenario_id are required")
+        if ttl_seconds <= 0:
+            raise ValueError("ttl_seconds must be positive")
+
+        binding = RuntimeSessionBinding(
+            session_id=session_id,
+            scenario_id=scenario_id,
+            mcp_bearer=secrets.token_urlsafe(32),
+            llm_callback_bearer=secrets.token_urlsafe(32),
+            expires_at=datetime.now(timezone.utc) + timedelta(seconds=ttl_seconds),
+        )
+        with self._lock:
+            self.expire_session_sync(session_id)
+            self._mcp[binding.mcp_bearer] = binding
+            self._llm[binding.llm_callback_bearer] = binding
+        return binding
+
+    def resolve_mcp_sync(self, bearer: str) -> Optional[RuntimeSessionBinding]:
+        with self._lock:
+            return self._resolve(self._mcp, bearer)
+
+    def resolve_llm_sync(self, bearer: str) -> Optional[RuntimeSessionBinding]:
+        with self._lock:
+            return self._resolve(self._llm, bearer)
+
+    def _resolve(
+        self, index: dict[str, RuntimeSessionBinding], bearer: str
+    ) -> Optional[RuntimeSessionBinding]:
+        binding = index.get(bearer)
+        if binding is None:
+            return None
+        if binding.expires_at <= datetime.now(timezone.utc):
+            self.expire_session_sync(binding.session_id)
+            return None
+        return binding
+
+    def expire_session_sync(self, session_id: str) -> None:
+        with self._lock:
+            self._mcp = {
+                token: binding
+                for token, binding in self._mcp.items()
+                if binding.session_id != session_id
+            }
+            self._llm = {
+                token: binding
+                for token, binding in self._llm.items()
+                if binding.session_id != session_id
+            }
 
 
 class ValidationStateStore:
@@ -22,6 +89,9 @@ class ValidationStateStore:
         self._lock = asyncio.Lock()
         self._permissions: dict[str, PendingPermission] = {}
         self._versions: dict[str, int] = {}
+        self._works: dict[str, list[SyntheticWork]] = {}
+        self._idempotency: dict[tuple[str, str], str] = {}
+        self._observations: list[ToolObservation] = []
 
     async def seed_permission(
         self, session_id: str, question: str, operation: str
@@ -84,3 +154,76 @@ class ValidationStateStore:
                 version=pending.version,
                 decision=decision,
             )
+
+    async def accept_work(
+        self, *, session_id: str, objective: str, idempotency_key: str
+    ) -> tuple[str, Optional[SyntheticWork]]:
+        async with self._lock:
+            if session_id in self._permissions:
+                return "permission_decision_required", None
+
+            idempotency_identity = (session_id, idempotency_key)
+            existing_id = self._idempotency.get(idempotency_identity)
+            if existing_id is not None:
+                existing = next(
+                    work
+                    for work in self._works.get(session_id, [])
+                    if work.work_id == existing_id
+                )
+                return "work_already_accepted", existing
+
+            work = SyntheticWork(
+                work_id=f"work_{secrets.token_urlsafe(12)}",
+                session_id=session_id,
+                objective=objective[:512],
+                idempotency_key=idempotency_key,
+                state="accepted",
+                created_at=datetime.now(timezone.utc),
+            )
+            self._works.setdefault(session_id, []).append(work)
+            self._idempotency[idempotency_identity] = work.work_id
+            return "work_accepted", work
+
+    async def list_works(self, session_id: str) -> list[SyntheticWork]:
+        async with self._lock:
+            return list(self._works.get(session_id, []))
+
+    async def find_work(
+        self, *, session_id: str, work_id: Optional[str] = None
+    ) -> Optional[SyntheticWork]:
+        async with self._lock:
+            works = self._works.get(session_id, [])
+            if work_id is None:
+                return works[-1] if works else None
+            return next((work for work in works if work.work_id == work_id), None)
+
+    async def cancel_work(
+        self, *, session_id: str, work_id: Optional[str] = None
+    ) -> Optional[SyntheticWork]:
+        async with self._lock:
+            works = self._works.get(session_id, [])
+            target_index = next(
+                (
+                    index
+                    for index in range(len(works) - 1, -1, -1)
+                    if work_id is None or works[index].work_id == work_id
+                ),
+                None,
+            )
+            if target_index is None:
+                return None
+            cancelled = replace(works[target_index], state="cancelled")
+            works[target_index] = cancelled
+            return cancelled
+
+    async def record_observation(self, observation: ToolObservation) -> None:
+        async with self._lock:
+            self._observations.append(observation)
+
+    async def list_observations(self, session_id: str) -> list[ToolObservation]:
+        async with self._lock:
+            return [
+                observation
+                for observation in self._observations
+                if observation.session_id == session_id
+            ]

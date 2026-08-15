@@ -70,6 +70,19 @@ Frontend calls these as `/api/*`. Next rewrites those calls to `AGENT_BACKEND_UR
 
 Token007 (AccessToken2) — generated from `AGORA_APP_ID` + `AGORA_APP_CERTIFICATE` only. No API_KEY/API_SECRET needed. The SDK handles token generation and API auth internally.
 
+## Architecture-validation ingress
+
+The temporary Voice LLM comparison adds two ASGI surfaces in one local process so they can share process-local validation state:
+
+```text
+Browser -> loopback FastAPI:8000 -> agent lifecycle and local seed controls
+Agora Cloud -> ngrok -> public ASGI:8001 -> authenticated /mcp only
+```
+
+`server/src/architecture_validation/public_server.py` constructs the public surface. It contains the Streamable HTTP MCP app and no token, agent lifecycle, seed, diagnostics, or report routes. Every MCP request requires a runner-issued, per-session capability. `server/src/server.py` mounts the validation admin router, whose handlers reject non-loopback clients.
+
+The live runner must own both listeners in one process. Running the public app separately would create another in-memory capability registry and is unsupported. The four MCP tools operate on synthetic receipts only; they do not start ACP, coding agents, commands, or file operations.
+
 ## Detailed Documentation
 
 - [docs/ai/L1/02_architecture.md](./docs/ai/L1/02_architecture.md) — web ↔ FastAPI topology, rewrites, lifecycle

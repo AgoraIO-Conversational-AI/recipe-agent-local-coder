@@ -23,6 +23,12 @@ FAKE_ENV = {
 
 
 @pytest.fixture
+def anyio_backend():
+    """Keep async tests on asyncio; the application does not depend on Trio."""
+    return "asyncio"
+
+
+@pytest.fixture
 def fake_env(monkeypatch):
     """Inject a deterministic env and stop dotenv from clobbering it."""
     import dotenv

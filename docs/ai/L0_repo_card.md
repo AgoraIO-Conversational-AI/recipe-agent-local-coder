@@ -1,6 +1,6 @@
 # agora-conversational-ai-demo (python) — Repo Card
 
-> Next.js web client + Python FastAPI backend for an Agora Conversational AI voice agent with live transcript.
+> Next.js web client + Python FastAPI backend for an Agora Conversational AI voice agent with an isolated Voice LLM architecture-validation surface.
 
 ## Identity
 
@@ -11,7 +11,7 @@
 | Language      | Python 3.10+ (FastAPI + uvicorn) backend + Next.js 16 / React 19 web  |
 | Deploy Target | `web/` as Next.js app, `server/` as a reachable FastAPI service      |
 | Owner         | Agora Conversational AI DevEx                                        |
-| Last Reviewed | 2026-06-11                                                           |
+| Last Reviewed | 2026-08-15                                                           |
 | Recipe Role   | `base`                                                               |
 | Recipe Version | `1.0.0`                                                             |
 | Recipe Status | `experimental`                                                       |

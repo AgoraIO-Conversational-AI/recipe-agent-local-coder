@@ -11,6 +11,7 @@
 | `/get_config`  | GET    | Query: optional `channel`, optional `uid`                                            | `{ "code": 0, "msg": "success", "data": { app_id, token, uid, channel_name, agent_uid } }`   | `500` if `agent is None`; exceptions via `_to_http_error`        |
 | `/startAgent`  | POST   | JSON `StartAgentRequest`: `channelName`, `rtcUid`, `userUid`, optional `parameters`  | `{ "code": 0, "msg": "success", "data": { agent_id, channel_name, status } }`                | `400` validation (`ValueError`); `500` runtime / generic        |
 | `/stopAgent`   | POST   | JSON `StopAgentRequest`: `agentId`                                                   | `{ "code": 0, "msg": "success" }`                                                            | Same shape                                                       |
+| `/validation/admin/permissions` | POST | Loopback-only bounded permission seed | Current authorization ID, version, operation, and question | `403` for non-loopback clients |
 
 CORS middleware: `allow_origins=["*"]`, `allow_credentials=True`.
 
@@ -111,6 +112,8 @@ agent_id = await session.start()
 | `GetConfigResponse`           | `web/src/services/api.ts`                      | Browser shape for `data` field                   |
 
 ## Related Deep Dives
+
+The separate validation public app exposes authenticated Streamable HTTP at `/mcp/` with exactly four tools: `start_work`, `get_work_status`, `cancel_work`, and `respond_permission`. Session identity is derived from a runner-issued bearer and is never accepted as a model-provided tool argument. The public app does not expose any route in the table above.
 
 - [Managed Agent Config](L2/managed_agent_config.md) — Detailed field reference.
 - [Verification Scripts](L2/verification_scripts.md) — How the contracts above are enforced by local pre-ship checks.

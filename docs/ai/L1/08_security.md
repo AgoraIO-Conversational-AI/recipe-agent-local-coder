@@ -79,6 +79,14 @@ If you need real auth, add a FastAPI dependency that validates a header on each 
 - `server/scripts/run_fake_server.py` accepts the same routes with no validation. Do not deploy it.
 - The web client does not encrypt or sign the browser → Next → FastAPI path beyond TLS at the host level.
 
+## Architecture-validation boundary
+
+- ngrok maps only the dedicated public ASGI listener, never the lifecycle FastAPI port.
+- MCP requests require a per-session, 256-bit runner-issued capability held only in memory.
+- Model-provided tool arguments cannot select a session.
+- Loopback seed controls verify the socket peer and do not trust forwarding headers.
+- Validation evidence is gitignored because it can contain transcripts; recursive credential redaction is added with the evidence recorder.
+
 ## Related Deep Dives
 
 - [Managed Agent Config](L2/managed_agent_config.md) — Where to plug BYOK vendor keys.

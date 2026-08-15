@@ -24,6 +24,8 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from agora_agent.agentkit.token import generate_convo_ai_token
 from agent import Agent
+from architecture_validation.admin import build_admin_router
+from architecture_validation.runtime import capability_registry, state_store
 
 logger = logging.getLogger("uvicorn.error")
 
@@ -195,6 +197,9 @@ async def stop_agent(request: StopAgentRequest):
 
 
 app.include_router(router)
+app.include_router(
+    build_admin_router(store=state_store, registry=capability_registry)
+)
 
 
 if __name__ == "__main__":

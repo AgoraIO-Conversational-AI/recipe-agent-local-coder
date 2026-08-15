@@ -87,6 +87,12 @@ Agent parameters: `data_channel="rtm"`, `enable_error_message=True`, `enable_met
 - Next.js rewrites hide backend placement from the browser — `/api/*` is the only URL the client knows.
 - Single repo keeps web and backend changes reviewable together while preserving deploy separation.
 
+## Validation-only public boundary
+
+The Voice LLM architecture validation constructs a second ASGI app at `server/src/architecture_validation/public_server.py`. The live runner serves it on a separate loopback port and exposes only that port through ngrok. It contains authenticated Streamable HTTP MCP and, only for the Custom candidate, the authenticated LLM callback. Local lifecycle and seed routes remain on the original FastAPI surface and are never mounted into the public app.
+
+Both ASGI apps must run in one process because validation capabilities and synthetic state are deliberately in memory. This boundary is temporary and does not implement the production Task Runtime.
+
 ## Related Deep Dives
 
 - [Managed Agent Config](L2/managed_agent_config.md) — Full `agent.py` chain and tunable fields.

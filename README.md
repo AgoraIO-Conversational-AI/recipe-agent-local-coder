@@ -6,6 +6,8 @@
 
 Build a production-style voice agent with a Next.js web client and Python FastAPI backend. This quickstart includes live transcript, agent visualizer ([Agent UIKit](https://agoraio-conversational-ai.github.io/agent-uikit/)), and managed STT/LLM/TTS defaults.
 
+> This derivative is currently running a bounded Voice LLM architecture validation. Validation code is isolated under `server/src/architecture_validation/` and does not execute ACP or local coding work. See [`validation/README.md`](validation/README.md).
+
 ## Prerequisites
 
 - [Python 3.10+](https://www.python.org/)
@@ -94,6 +96,8 @@ Primary backend env file: [`server/.env.example`](server/.env.example).
 | `AGENT_GREETING` |  | built-in greeting | Optional opening line override |
 | `PORT` |  | `8000` | FastAPI server port |
 | `AGENT_BACKEND_URL` (web deploy) | ✅ | — | Required in deployed `web` app when proxying to external FastAPI |
+
+Architecture-validation variables are documented in `server/.env.example`. Per-session MCP and Custom LLM callback capabilities are generated at runtime and are never developer-managed environment variables.
 
 > **Default vs BYOK** — this quickstart defaults to Agora-managed STT + LLM + TTS in the backend. Enable BYOK by uncommenting provider blocks in `server/src/agent.py` and adding matching keys.
 

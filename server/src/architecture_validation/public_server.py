@@ -1,0 +1,42 @@
+"""Public validation ingress containing only authenticated callback routes."""
+
+from contextlib import asynccontextmanager
+
+from fastapi import FastAPI
+
+from .mcp_app import McpBearerAuthMiddleware, create_mcp_server
+from .runtime import capability_registry, state_store
+from .state import CapabilityRegistry, ValidationStateStore
+
+
+def create_public_app(
+    *,
+    store: ValidationStateStore,
+    registry: CapabilityRegistry,
+    include_custom_llm: bool,
+) -> FastAPI:
+    mcp = create_mcp_server(store)
+    mcp_asgi = McpBearerAuthMiddleware(mcp.streamable_http_app(), registry)
+
+    @asynccontextmanager
+    async def lifespan(_app):
+        async with mcp.session_manager.run():
+            yield
+
+    app = FastAPI(
+        title="Voice LLM Validation Public Ingress",
+        docs_url=None,
+        redoc_url=None,
+        openapi_url=None,
+        lifespan=lifespan,
+    )
+    app.state.include_custom_llm = include_custom_llm
+    app.mount("/mcp", mcp_asgi)
+    return app
+
+
+app = create_public_app(
+    store=state_store,
+    registry=capability_registry,
+    include_custom_llm=False,
+)

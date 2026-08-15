@@ -57,6 +57,8 @@ AGENT_BACKEND_URL=http://localhost:8000
 | `AGENT_BACKEND_URL`      | Next build (web)     | Yes for rewrites | Empty/missing → no `/api/*` rewrites registered. Required by `web/scripts/doctor.ts`. |
 | `NEXT_PUBLIC_AGENT_UID`  | Browser (web)        | No       | Optional UID override read in `ConversationComponent.tsx`.            |
 
+Architecture validation additionally uses `VOICE_LLM_PATH`, Agora REST credentials for the Managed candidate, one real model-provider key for the Custom candidate, `VALIDATION_MODEL`, and `PUBLIC_VALIDATION_BASE_URL`. The runner creates MCP and LLM callback capabilities in memory; do not add static capability tokens to `.env.local`.
+
 ## Python Dependencies
 
 `server/requirements.txt`:
@@ -67,6 +69,7 @@ uvicorn>=0.20.0
 requests>=2.31.0
 python-dotenv>=1.0.0
 agora-agents>=2.0.0
+mcp>=1.2.0,<2
 ```
 
 The SDK is lower-bounded at v2 — add an upper bound or exact pin if you need reproducible SDK behavior.

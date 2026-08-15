@@ -62,6 +62,13 @@ server/                   # Python FastAPI backend
     __init__.py
     server.py             # FastAPI app + APIRouter routes
     agent.py              # Agent class: start, stop, vendor chain
+    architecture_validation/
+      admin.py            # Loopback-only state seeding
+      mcp_app.py          # Authenticated FastMCP tool surface
+      public_server.py    # Minimal public ASGI app factory
+      runtime.py          # Process-local shared state
+      state.py            # Capability, permission, and synthetic Work state
+      tools.py            # Four shared validation tools
   scripts/
     run_fake_server.py    # Patches Agent to a FakeAgent for smoke tests
 ```
@@ -81,6 +88,7 @@ server/                   # Python FastAPI backend
 | `web/scripts/verify-local-fastapi.ts`               | Spawns `server/scripts/run_fake_server.py`, exercises full path.         |
 | `server/src/server.py`                              | FastAPI app, env loading, three routes, response envelope, error mapping.|
 | `server/src/agent.py`                               | `Agent` class — vendor chain + async session lifecycle.                  |
+| `server/src/architecture_validation/`               | Temporary Voice LLM comparison state, tools, and isolated public ingress.|
 | `server/scripts/run_fake_server.py`                 | Patches `server.agent` to `FakeAgent` for verification.                  |
 
 ## Module Boundaries

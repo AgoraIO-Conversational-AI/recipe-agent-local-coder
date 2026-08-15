@@ -11,11 +11,6 @@ def store():
     return ValidationStateStore()
 
 
-@pytest.fixture
-def anyio_backend():
-    return "asyncio"
-
-
 @pytest.mark.anyio
 async def test_seed_permission_is_current_and_versions_increase(store):
     first = await store.seed_permission(
