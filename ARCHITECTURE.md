@@ -87,6 +87,8 @@ For the Managed candidate, the existing authenticated Agent session replaces the
 
 For the Custom candidate, the public app additionally mounts `/llm/chat/completions`. A separate runner-issued callback capability identifies the session; the handler removes stale validation context, injects the same bounded current permission before the latest user message, and forwards one real OpenAI-compatible streaming request. It does not persist history, execute tools, or transform SSE tool-call chunks.
 
+`server/src/architecture_validation/config.py` reads the versioned comparison controls once. `server/src/agent.py` builds either `OpenAI` or `CustomLLM` with identical prompt, model controls, history, MCP endpoint, bearer header, allowed tools, STT, TTS, turn detection, and session settings. Only the provider class, callback URL, and callback bearer differ.
+
 ## Detailed Documentation
 
 - [docs/ai/L1/02_architecture.md](./docs/ai/L1/02_architecture.md) — web ↔ FastAPI topology, rewrites, lifecycle

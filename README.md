@@ -99,6 +99,8 @@ Primary backend env file: [`server/.env.example`](server/.env.example).
 
 Architecture-validation variables are documented in `server/.env.example`. Per-session MCP and Custom LLM callback capabilities are generated at runtime and are never developer-managed environment variables.
 
+`VOICE_LLM_PATH` is required during validation and accepts exactly `managed` or `custom`. Both paths read model and generation controls from `validation/corpus.json`; `VALIDATION_MODEL` must match that corpus. Only the Custom path requires `MODEL_PROVIDER_API_KEY`.
+
 > **Default vs BYOK** — this quickstart defaults to Agora-managed STT + LLM + TTS in the backend. Enable BYOK by uncommenting provider blocks in `server/src/agent.py` and adding matching keys.
 
 ## Commands

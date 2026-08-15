@@ -64,6 +64,7 @@ server/                   # Python FastAPI backend
     agent.py              # Agent class: start, stop, vendor chain
     architecture_validation/
       admin.py            # Loopback-only state seeding
+      config.py           # Fail-closed shared candidate/model controls
       context.py          # Shared bounded permission projection
       custom_llm.py       # Authenticated context injection and SSE forwarding
       managed.py          # Agent-session update and APPEND speech adapter

@@ -4,6 +4,7 @@ from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
 from architecture_validation.admin import build_admin_router
+from architecture_validation.custom_llm import CustomLlmProxyConfig
 from architecture_validation.public_server import create_public_app
 from architecture_validation.state import CapabilityRegistry, ValidationStateStore
 
@@ -76,3 +77,23 @@ def test_admin_seed_route_rejects_non_loopback_client():
         )
 
     assert response.status_code == 403
+
+
+def test_custom_route_is_mounted_only_when_explicitly_configured():
+    store = ValidationStateStore()
+    registry = CapabilityRegistry()
+    custom_app = create_public_app(
+        store=store,
+        registry=registry,
+        include_custom_llm=True,
+        custom_llm_config=CustomLlmProxyConfig(
+            provider_base_url="https://provider.example/v1",
+            provider_api_key="provider-secret",
+            model="gpt-4o-mini",
+        ),
+    )
+
+    with TestClient(custom_app) as client:
+        response = client.post("/llm/chat/completions", json={})
+
+    assert response.status_code == 401

@@ -19,6 +19,11 @@ if _SERVER_SRC not in sys.path:
 FAKE_ENV = {
     "AGORA_APP_ID": "0123456789abcdef0123456789abcdef",
     "AGORA_APP_CERTIFICATE": "fedcba9876543210fedcba9876543210",
+    "VOICE_LLM_PATH": "managed",
+    "VALIDATION_MODEL": "gpt-4o-mini",
+    "PUBLIC_VALIDATION_BASE_URL": "https://validation.example.com",
+    "MODEL_PROVIDER_BASE_URL": "https://api.openai.com/v1",
+    "MODEL_PROVIDER_API_KEY": "",
 }
 
 
