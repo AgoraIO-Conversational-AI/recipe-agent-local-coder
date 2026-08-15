@@ -24,6 +24,10 @@ dist/
 .env.local
 .env.*.local
 
+# Architecture validation evidence is local and can contain transcripts.
+validation/results/*.json
+validation/results/*.md
+
 # Agora CLI local project binding
 .agora/
 
