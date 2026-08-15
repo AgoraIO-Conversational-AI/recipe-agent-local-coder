@@ -81,6 +81,25 @@ class CapabilityRegistry:
                 if binding.session_id != session_id
             }
 
+    def set_scenario_sync(
+        self, session_id: str, scenario_id: str
+    ) -> RuntimeSessionBinding:
+        with self._lock:
+            binding = next(
+                (
+                    item
+                    for item in self._mcp.values()
+                    if item.session_id == session_id
+                ),
+                None,
+            )
+            if binding is None:
+                raise KeyError("active session binding not found")
+            updated = replace(binding, scenario_id=scenario_id)
+            self._mcp[updated.mcp_bearer] = updated
+            self._llm[updated.llm_callback_bearer] = updated
+            return updated
+
 
 class ValidationStateStore:
     """Hold the current validation permission independently for each session."""
@@ -226,4 +245,20 @@ class ValidationStateStore:
                 observation
                 for observation in self._observations
                 if observation.session_id == session_id
+            ]
+
+    async def reset_session(self, session_id: str) -> None:
+        """Clear trial state while preserving monotonic permission versions."""
+        async with self._lock:
+            self._permissions.pop(session_id, None)
+            self._works.pop(session_id, None)
+            self._idempotency = {
+                identity: work_id
+                for identity, work_id in self._idempotency.items()
+                if identity[0] != session_id
+            }
+            self._observations = [
+                observation
+                for observation in self._observations
+                if observation.session_id != session_id
             ]

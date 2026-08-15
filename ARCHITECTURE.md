@@ -89,6 +89,8 @@ For the Custom candidate, the public app additionally mounts `/llm/chat/completi
 
 `server/src/architecture_validation/config.py` reads the versioned comparison controls once. `server/src/agent.py` builds either `OpenAI` or `CustomLLM` with identical prompt, model controls, history, MCP endpoint, bearer header, allowed tools, STT, TTS, turn detection, and session settings. Only the provider class, callback URL, and callback bearer differ.
 
+The interactive runner owns both Uvicorn listeners, rotates the active scenario on the same per-session capabilities, seeds only synthetic state, and appends recursively redacted JSONL evidence. Invalidated operator/setup attempts remain in evidence under unique IDs and are rerun. The report applies safety disqualifiers before tool accuracy, configuration burden, p95 latency, and failure rate.
+
 ## Detailed Documentation
 
 - [docs/ai/L1/02_architecture.md](./docs/ai/L1/02_architecture.md) — web ↔ FastAPI topology, rewrites, lifecycle

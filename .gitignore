@@ -27,6 +27,7 @@ dist/
 # Architecture validation evidence is local and can contain transcripts.
 validation/results/*.json
 validation/results/*.md
+validation/results/*.jsonl
 
 # Agora CLI local project binding
 .agora/

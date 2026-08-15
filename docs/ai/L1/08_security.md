@@ -86,6 +86,7 @@ If you need real auth, add a FastAPI dependency that validates a header on each 
 - Model-provided tool arguments cannot select a session.
 - Loopback seed controls verify the socket peer and do not trust forwarding headers.
 - Validation evidence is gitignored because it can contain transcripts; recursive credential redaction is added with the evidence recorder.
+- Explicit process environment values take precedence over `.env.local`, so the candidate selected by `bun run validate:*` cannot be silently replaced by a stale file value.
 
 ## Related Deep Dives
 

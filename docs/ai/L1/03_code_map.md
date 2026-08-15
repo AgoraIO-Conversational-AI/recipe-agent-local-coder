@@ -70,6 +70,9 @@ server/                   # Python FastAPI backend
       managed.py          # Agent-session update and APPEND speech adapter
       mcp_app.py          # Authenticated FastMCP tool surface
       public_server.py    # Minimal public ASGI app factory
+      recorder.py         # Append-only recursively redacted evidence
+      report.py           # Deterministic safety-first comparison report
+      runner.py           # Interactive dual-listener live matrix
       runtime.py          # Process-local shared state
       state.py            # Capability, permission, and synthetic Work state
       tools.py            # Four shared validation tools

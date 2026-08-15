@@ -90,6 +90,9 @@ bun run verify:web:api         # web/scripts/verify-api-contracts.ts
 bun run verify:web:proxy       # web/scripts/verify-local-proxy.ts
 bun run verify:local:fastapi   # spawns server/scripts/run_fake_server.py
 bun run clean                  # remove backend venv, node_modules, .next, web/dist
+bun run validate:managed       # interactive Managed live matrix
+bun run validate:custom        # interactive Custom live matrix
+bun run validate:report        # local redacted decision report
 ```
 
 `cd web && bun run doctor` separately enforces `AGENT_BACKEND_URL` validity.
