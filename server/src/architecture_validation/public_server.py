@@ -4,6 +4,7 @@ from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 
+from .custom_llm import CustomLlmProxyConfig, create_custom_llm_router
 from .mcp_app import McpBearerAuthMiddleware, create_mcp_server
 from .runtime import capability_registry, state_store
 from .state import CapabilityRegistry, ValidationStateStore
@@ -14,6 +15,7 @@ def create_public_app(
     store: ValidationStateStore,
     registry: CapabilityRegistry,
     include_custom_llm: bool,
+    custom_llm_config: CustomLlmProxyConfig | None = None,
 ) -> FastAPI:
     mcp = create_mcp_server(store)
     mcp_asgi = McpBearerAuthMiddleware(mcp.streamable_http_app(), registry)
@@ -31,6 +33,16 @@ def create_public_app(
         lifespan=lifespan,
     )
     app.state.include_custom_llm = include_custom_llm
+    if include_custom_llm:
+        if custom_llm_config is None:
+            raise ValueError("custom_llm_config is required for the Custom path")
+        app.include_router(
+            create_custom_llm_router(
+                store=store,
+                registry=registry,
+                config=custom_llm_config,
+            )
+        )
     app.mount("/mcp", mcp_asgi)
     return app
 

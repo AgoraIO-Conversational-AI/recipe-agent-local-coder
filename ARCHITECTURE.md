@@ -85,6 +85,8 @@ The live runner must own both listeners in one process. Running the public app s
 
 For the Managed candidate, the existing authenticated Agent session replaces the complete `llm.system_messages` list with the base prompt plus at most one bounded current permission. The same session announces the question with one `say(..., priority="APPEND", interruptable=True)` call. No separate Agora REST credentials are required.
 
+For the Custom candidate, the public app additionally mounts `/llm/chat/completions`. A separate runner-issued callback capability identifies the session; the handler removes stale validation context, injects the same bounded current permission before the latest user message, and forwards one real OpenAI-compatible streaming request. It does not persist history, execute tools, or transform SSE tool-call chunks.
+
 ## Detailed Documentation
 
 - [docs/ai/L1/02_architecture.md](./docs/ai/L1/02_architecture.md) — web ↔ FastAPI topology, rewrites, lifecycle

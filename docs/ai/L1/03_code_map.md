@@ -65,6 +65,7 @@ server/                   # Python FastAPI backend
     architecture_validation/
       admin.py            # Loopback-only state seeding
       context.py          # Shared bounded permission projection
+      custom_llm.py       # Authenticated context injection and SSE forwarding
       managed.py          # Agent-session update and APPEND speech adapter
       mcp_app.py          # Authenticated FastMCP tool surface
       public_server.py    # Minimal public ASGI app factory
