@@ -7,7 +7,7 @@
   ],
   "scripts": {
     "dev": "bun run dev:check && concurrently -n backend,frontend -c blue,green \"bun run dev:backend\" \"bun run dev:frontend\"",
-    "dev:codex": "bun run dev:codex:check && concurrently -n backend,frontend -c blue,green \"bun run dev:backend:codex\" \"bun run dev:frontend:codex\"",
+    "dev:codex": "bun run dev:codex:check && bash scripts/run-local-codex.sh",
     "dev:codex:check": "bun run setup:env && bun run setup:deps && bun run setup:backend:if-needed && bun run doctor",
     "dev:check": "bun run setup:env && bun run setup:deps",
     "dev:backend": "cd server && bash -c '(venv/bin/python -m pip --version >/dev/null 2>&1 || (rm -rf venv && python3 -m venv venv)) && source venv/bin/activate && python -m pip install -q -r requirements.txt && python src/server.py'",
@@ -31,6 +31,7 @@
     "verify": "bun run verify:web",
     "verify:local": "bun run doctor:local && bun run verify:backend && bun run verify:local:fastapi && bun run verify:web:proxy && bun run verify:web:build",
     "verify:local:fastapi": "cd web && bun run scripts/verify-local-fastapi.ts",
+    "verify:launcher": "bun run scripts/verify-local-launcher.ts",
     "verify:backend": "cd server && source venv/bin/activate && python -m compileall -q src && PYTHONPATH=src pytest tests/architecture_validation tests/acp_runtime -q",
     "verify:web": "bun run doctor && bun run verify:web:api && bun run verify:web:build",
     "verify:web:api": "cd web && bun run scripts/verify-api-contracts.ts",

@@ -1,6 +1,7 @@
 """Loopback-only Project Folder configuration routes."""
 
 from dataclasses import asdict
+from typing import Protocol
 
 from fastapi import APIRouter, HTTPException, Request
 from pydantic import BaseModel
@@ -15,6 +16,21 @@ class SelectWorkspaceRequest(BaseModel):
     path: str
 
 
+class WorkspaceSwitchGuard(Protocol):
+    """Optional future Work/permission gate before a Project Folder switch."""
+
+    def check(self, previous: WorkspaceStatus, path: str) -> str | None:
+        """Return a stable conflict message, or None when a switch is allowed."""
+
+
+class AllowWorkspaceSwitch:
+    """Default guard for the current runtime, which has no Work state yet."""
+
+    def check(self, previous: WorkspaceStatus, path: str) -> str | None:
+        del previous, path
+        return None
+
+
 def _envelope(status: WorkspaceStatus) -> dict[str, object]:
     return {
         "code": 0,
@@ -24,9 +40,14 @@ def _envelope(status: WorkspaceStatus) -> dict[str, object]:
 
 
 def build_workspace_router(
-    *, service: WorkspaceService, picker: DirectoryPicker, runtime: LocalRuntimeCoordinator
+    *,
+    service: WorkspaceService,
+    picker: DirectoryPicker,
+    runtime: LocalRuntimeCoordinator,
+    switch_guard: WorkspaceSwitchGuard | None = None,
 ) -> APIRouter:
     router = APIRouter(prefix="/local/workspace", include_in_schema=False)
+    resolved_guard = switch_guard or AllowWorkspaceSwitch()
 
     @router.get("")
     async def get_workspace(request: Request) -> dict[str, object]:
@@ -42,14 +63,14 @@ def build_workspace_router(
                 status_code=409,
                 detail="Project Folder selection was cancelled",
             )
-        return await _select_and_activate(service, runtime, selected)
+        return await _select_and_activate(service, runtime, resolved_guard, selected)
 
     @router.put("")
     async def select_workspace(
         payload: SelectWorkspaceRequest, request: Request
     ) -> dict[str, object]:
         require_loopback(request)
-        return await _select_and_activate(service, runtime, payload.path)
+        return await _select_and_activate(service, runtime, resolved_guard, payload.path)
 
     @router.delete("")
     async def clear_workspace(request: Request) -> dict[str, object]:
@@ -77,10 +98,16 @@ def build_runtime_router(*, runtime: LocalRuntimeCoordinator) -> APIRouter:
 
 
 async def _select_and_activate(
-    service: WorkspaceService, runtime: LocalRuntimeCoordinator, path: str
+    service: WorkspaceService,
+    runtime: LocalRuntimeCoordinator,
+    switch_guard: WorkspaceSwitchGuard,
+    path: str,
 ) -> dict[str, object]:
     """Persist a new folder only when its replacement ACP session is ready."""
     previous = service.status()
+    conflict = switch_guard.check(previous, path)
+    if conflict is not None:
+        raise HTTPException(status_code=409, detail=conflict)
     try:
         selected = service.select(path)
     except ValueError as exc:

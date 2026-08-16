@@ -9,7 +9,12 @@ from typing import Any, Mapping, Sequence
 import acp
 from acp.schema import DeniedOutcome
 
-from .acp_client import AcpPermissionRequest, AcpSession, AcpSessionEvent
+from .acp_client import (
+    AcpAuthenticationRequired,
+    AcpPermissionRequest,
+    AcpSession,
+    AcpSessionEvent,
+)
 
 
 _MAX_PERMISSION_OPERATION_BYTES = 160
@@ -113,7 +118,10 @@ class CodexAcpClient:
             initialized = await connection.initialize(protocol_version=acp.PROTOCOL_VERSION)
             chatgpt_method = _advertised_chatgpt_method(initialized.auth_methods)
             if chatgpt_method is not None:
-                await connection.authenticate(chatgpt_method)
+                try:
+                    await connection.authenticate(chatgpt_method)
+                except Exception as exc:
+                    raise AcpAuthenticationRequired() from exc
             new_session = await connection.new_session(
                 cwd=resolved_path,
                 mcp_servers=[],

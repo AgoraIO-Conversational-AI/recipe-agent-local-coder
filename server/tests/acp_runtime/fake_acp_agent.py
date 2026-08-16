@@ -15,9 +15,12 @@ def _record(path: Path, request: str) -> None:
 
 
 class FakeAcpAgent:
-    def __init__(self, record_path: Path, requires_authentication: bool) -> None:
+    def __init__(
+        self, record_path: Path, requires_authentication: bool, authentication_fails: bool
+    ) -> None:
         self.record_path = record_path
         self.requires_authentication = requires_authentication
+        self.authentication_fails = authentication_fails
 
     async def initialize(self, protocol_version: int, **_kwargs):
         _record(self.record_path, "initialize")
@@ -35,6 +38,8 @@ class FakeAcpAgent:
         if method_id != "chatgpt":
             raise ValueError("unexpected authentication method")
         _record(self.record_path, "authenticate")
+        if self.authentication_fails:
+            raise RuntimeError("fake authentication failure")
         return acp.AuthenticateResponse()
 
     async def new_session(self, cwd: str, mcp_servers, **_kwargs):
@@ -53,11 +58,14 @@ class FakeAcpAgent:
 class FakeAcpAgentProcess:
     record_path: Path
     requires_authentication: bool = False
+    authentication_fails: bool = False
 
     @property
     def command(self) -> tuple[str, ...]:
         command = (sys.executable, str(Path(__file__)), str(self.record_path))
-        return (*command, "--requires-authentication") if self.requires_authentication else command
+        if self.requires_authentication:
+            command = (*command, "--requires-authentication")
+        return (*command, "--authentication-fails") if self.authentication_fails else command
 
     @property
     def requests(self) -> list[str]:
@@ -70,8 +78,10 @@ class FakeAcpAgentProcess:
         return "process/exited" in self.requests
 
 
-async def _serve(record_path: Path, requires_authentication: bool) -> None:
-    agent = FakeAcpAgent(record_path, requires_authentication)
+async def _serve(
+    record_path: Path, requires_authentication: bool, authentication_fails: bool
+) -> None:
+    agent = FakeAcpAgent(record_path, requires_authentication, authentication_fails)
     try:
         await acp.run_agent(agent, use_unstable_protocol=True)
     finally:
@@ -81,7 +91,8 @@ async def _serve(record_path: Path, requires_authentication: bool) -> None:
 def main() -> None:
     record_path = Path(sys.argv[1])
     requires_authentication = "--requires-authentication" in sys.argv[2:]
-    asyncio.run(_serve(record_path, requires_authentication))
+    authentication_fails = "--authentication-fails" in sys.argv[2:]
+    asyncio.run(_serve(record_path, requires_authentication, authentication_fails))
 
 
 if __name__ == "__main__":

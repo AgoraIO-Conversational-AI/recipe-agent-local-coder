@@ -4,7 +4,7 @@ import { FolderOpen, Loader2, Settings2, X } from 'lucide-react'
 import { useEffect, useState } from 'react'
 
 import { Button } from '@/components/ui/button'
-import type { WorkspaceStatus } from '@/lib/workspace'
+import type { LocalRuntimeStatus, WorkspaceStatus } from '@/lib/workspace'
 import { workspaceNeedsConfiguration } from '@/lib/workspace'
 import { browseWorkspace, getLocalRuntime, selectWorkspace } from '@/services/api'
 
@@ -13,6 +13,7 @@ type ProjectFolderSettingsProps = {
   status: WorkspaceStatus | null
   initialError: string | null
   onStatusChange: (status: WorkspaceStatus) => void
+  onRuntimeStatusChange: (status: LocalRuntimeStatus) => void
   onClose: () => void
 }
 
@@ -21,6 +22,7 @@ export function ProjectFolderSettings({
   status,
   initialError,
   onStatusChange,
+  onRuntimeStatusChange,
   onClose,
 }: ProjectFolderSettingsProps) {
   const [manualPath, setManualPath] = useState('')
@@ -55,6 +57,7 @@ export function ProjectFolderSettings({
       if (runtime.state !== 'ready') {
         throw new Error(runtime.error ?? 'The local Codex runtime is not ready')
       }
+      onRuntimeStatusChange(runtime)
       onStatusChange(nextStatus)
     } catch (nextError) {
       setError(nextError instanceof Error ? nextError.message : 'Could not select the Project Folder')

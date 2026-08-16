@@ -11,6 +11,10 @@ class AcpSession:
     primary_directory: str
 
 
+class AcpAuthenticationRequired(RuntimeError):
+    """The ACP client needs the user to complete its local sign-in flow."""
+
+
 @dataclass(frozen=True)
 class AcpSessionEvent:
     """A safe description of an ACP session update, without its content."""

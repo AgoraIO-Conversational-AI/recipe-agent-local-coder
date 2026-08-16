@@ -1,9 +1,10 @@
 """Coordinate one local ACP session with the saved Project Folder."""
 
+import asyncio
 from dataclasses import dataclass
 from typing import Literal
 
-from .acp_client import AcpClientPort
+from .acp_client import AcpAuthenticationRequired, AcpClientPort
 from .workspace import WorkspaceService, WorkspaceStatus
 
 
@@ -34,6 +35,7 @@ class LocalRuntimeCoordinator:
         self._state: RuntimeState = "configuration_required"
         self._error: str | None = None
         self._active_directory: str | None = None
+        self._lifecycle_lock = asyncio.Lock()
 
     def status(self) -> LocalRuntimeStatus:
         """Report readiness without spawning, authenticating, or changing selection."""
@@ -58,6 +60,10 @@ class LocalRuntimeCoordinator:
 
     async def start(self) -> LocalRuntimeStatus:
         """Open ACP only after a valid Project Folder has been saved."""
+        async with self._lifecycle_lock:
+            return await self._start()
+
+    async def _start(self) -> LocalRuntimeStatus:
         workspace = self._workspace.status()
         if workspace.state != "ready" or workspace.workspace is None:
             self._state = "configuration_required"
@@ -68,10 +74,14 @@ class LocalRuntimeCoordinator:
             and self._active_directory == workspace.workspace.primary_directory
         ):
             return self.status()
-        return await self.activate_workspace()
+        return await self._activate_workspace()
 
     async def activate_workspace(self) -> LocalRuntimeStatus:
         """Replace the active ACP session with one for the saved Project Folder."""
+        async with self._lifecycle_lock:
+            return await self._activate_workspace()
+
+    async def _activate_workspace(self) -> LocalRuntimeStatus:
         workspace = self._workspace.status()
         if workspace.state != "ready" or workspace.workspace is None:
             self._state = "configuration_required"
@@ -100,6 +110,10 @@ class LocalRuntimeCoordinator:
 
     async def close(self) -> None:
         """Release the one active ACP session during replacement or shutdown."""
+        async with self._lifecycle_lock:
+            await self._close()
+
+    async def _close(self) -> None:
         if self._active_directory is not None:
             await self._acp_client.close()
             self._active_directory = None
@@ -110,8 +124,7 @@ class LocalRuntimeCoordinator:
 
 def _runtime_failure(exc: Exception) -> tuple[RuntimeState, str]:
     detail = str(exc).strip() or type(exc).__name__
-    normalized = detail.casefold()
-    if any(token in normalized for token in ("auth", "sign in", "login", "chatgpt")):
+    if isinstance(exc, AcpAuthenticationRequired):
         return (
             "authentication_required",
             "Sign in to ChatGPT, then retry the local Codex runtime.",

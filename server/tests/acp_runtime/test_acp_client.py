@@ -2,6 +2,7 @@
 
 import pytest
 
+from acp_runtime.acp_client import AcpAuthenticationRequired
 from acp_runtime.codex import CodexAcpClient, CodexCommand
 from tests.acp_runtime.fake_acp_agent import FakeAcpAgentProcess
 
@@ -57,3 +58,20 @@ async def test_client_uses_advertised_chatgpt_authentication_only_when_required(
 
     assert fake_agent.requests == ["initialize", "authenticate", "session/new"]
     await client.close()
+
+
+@pytest.mark.anyio
+async def test_client_exposes_authentication_failure_as_typed_boundary_result(
+    tmp_path, project
+):
+    fake_agent = FakeAcpAgentProcess(
+        tmp_path / "acp-auth-failure-requests.txt",
+        requires_authentication=True,
+        authentication_fails=True,
+    )
+    client = CodexAcpClient(command=fake_agent.command)
+
+    with pytest.raises(AcpAuthenticationRequired):
+        await client.open(str(project))
+
+    assert fake_agent.requests == ["initialize", "authenticate", "process/exited"]

@@ -35,13 +35,31 @@ class FakeAcpClient:
         self.close_calls += 1
 
 
-def make_app(tmp_path):
+class FakeWorkspaceSwitchGuard:
+    def __init__(self) -> None:
+        self.reason: str | None = None
+        self.calls: list[tuple[str | None, str]] = []
+
+    def check(self, previous, path: str) -> str | None:
+        directory = previous.workspace.primary_directory if previous.workspace else None
+        self.calls.append((directory, path))
+        return self.reason
+
+
+def make_app(tmp_path, switch_guard=None):
     service = WorkspaceService(WorkspaceConfigStore(tmp_path / "workspace.json"))
     picker = FakeDirectoryPicker()
     fake_acp = FakeAcpClient()
     runtime = LocalRuntimeCoordinator(service, fake_acp)
     app = FastAPI()
-    app.include_router(build_workspace_router(service=service, picker=picker, runtime=runtime))
+    app.include_router(
+        build_workspace_router(
+            service=service,
+            picker=picker,
+            runtime=runtime,
+            switch_guard=switch_guard,
+        )
+    )
     app.include_router(build_runtime_router(runtime=runtime))
     return app, picker, runtime, fake_acp
 
@@ -179,3 +197,25 @@ def test_failed_activation_keeps_the_previous_workspace_selection(tmp_path):
     assert failed.status_code == 503
     assert failed.json()["detail"] == "Could not start the local Codex runtime: missing executable"
     assert restored.json()["data"]["workspace"]["primary_directory"] == str(previous)
+
+
+def test_switch_guard_blocks_before_persistence_or_acp_session_replacement(tmp_path):
+    previous = tmp_path / "previous"
+    next_project = tmp_path / "next"
+    previous.mkdir()
+    next_project.mkdir()
+    guard = FakeWorkspaceSwitchGuard()
+    app, _picker, _runtime, fake_acp = make_app(tmp_path, switch_guard=guard)
+
+    with TestClient(app) as client:
+        selected = client.put("/local/workspace", json={"path": str(previous)})
+        guard.reason = "Finish or resolve the pending permission before changing Project Folder."
+        blocked = client.put("/local/workspace", json={"path": str(next_project)})
+        restored = client.get("/local/workspace")
+
+    assert selected.status_code == 200
+    assert blocked.status_code == 409
+    assert blocked.json()["detail"] == guard.reason
+    assert restored.json()["data"]["workspace"]["primary_directory"] == str(previous)
+    assert fake_acp.opened == [str(previous)]
+    assert fake_acp.close_calls == 0
