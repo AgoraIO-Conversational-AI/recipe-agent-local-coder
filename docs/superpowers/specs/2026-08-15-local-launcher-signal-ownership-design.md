@@ -78,6 +78,25 @@ The supervisor accepts the backend and frontend commands as opaque argument
 values. It does not parse shell command content, credentials, Workspace paths,
 or ACP configuration.
 
+It uses only the system Python standard library guaranteed by local preflight,
+starts `concurrently` in a new session, and inherits the terminal's standard
+input and output so existing colors and interactive behavior remain intact.
+The launcher pins `concurrently` sibling cleanup to SIGTERM rather than relying
+on its implicit default. A spawn failure returns one bounded diagnostic and the
+conventional command-not-found status instead of a Python traceback.
+
+## Project Folder Selection Boundary
+
+The native macOS picker remains part of the local backend. A browser directory
+picker returns a browser-owned directory handle or relative file paths, not the
+absolute native path required for the ACP session `cwd`. The Web app therefore
+continues to trigger and poll the backend picker without receiving file access.
+
+Manual absolute-path entry and `--workspace` remain advanced fallbacks. A
+desktop application shell and a browser-owned filesystem architecture are out
+of scope. The supervisor treats the picker process like any other descendant;
+it contains no picker-specific cleanup branch.
+
 ## Verification
 
 Extend `scripts/verify-local-launcher.ts` with a process-group interrupt test
@@ -104,3 +123,4 @@ one-child failure, SIGINT cleanup, and SIGTERM cleanup. Then rerun the real
 - Changes to ACP session semantics
 - Production deployment supervision
 - Log filtering or suppression as a substitute for correct signal ownership
+- A pure Web directory picker or Electron/Tauri application shell
