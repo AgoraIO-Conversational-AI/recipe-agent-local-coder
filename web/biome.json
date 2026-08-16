@@ -37,6 +37,6 @@
     }
   },
   "files": {
-    "ignore": ["node_modules", "dist", ".git", ".next", "examples"]
+    "ignore": ["node_modules", "dist", ".git", ".next", "next-env.d.ts", "examples"]
   }
 }
