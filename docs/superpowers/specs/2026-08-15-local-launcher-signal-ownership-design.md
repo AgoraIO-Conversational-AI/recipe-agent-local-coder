@@ -31,6 +31,10 @@ environment contract. It delegates only process-group lifecycle to the
 supervisor. Backend and frontend commands, ports, Workspace persistence, ACP
 configuration, and Agora behavior do not change.
 
+After parsing arguments, the shell uses `exec` to replace itself with the
+supervisor. This leaves exactly one process in the terminal's foreground group
+to receive terminal signals.
+
 `concurrently` remains in the process tree. It continues to own labeled output,
 child fail-fast behavior, and sibling shutdown. Replacing it would require the
 supervisor to duplicate log multiplexing and child race handling. The two
@@ -46,6 +50,8 @@ Terminal -> Local Launcher Supervisor -> concurrently -> backend + frontend
   result.
 - The first SIGINT or SIGTERM starts shutdown and is forwarded once to the
   `concurrently` root process, not broadcast to its process group.
+- SIGHUP, including terminal-window closure, follows the same graceful-first
+  path so isolated descendants cannot remain after their terminal disappears.
 - A second SIGINT while graceful shutdown is in progress skips the remaining
   wait and sends SIGKILL to the isolated process group.
 - The supervisor waits for the group to exit and does not leave backend,
@@ -58,8 +64,8 @@ Terminal -> Local Launcher Supervisor -> concurrently -> backend + frontend
 
 The supervisor preserves `concurrently`'s exit status for normal completion or
 a child failure. A completed SIGINT shutdown returns `130`, a completed SIGTERM
-shutdown returns `143`, and forced cleanup after a second Ctrl-C or the
-10-second deadline returns `137`.
+shutdown returns `143`, and a completed SIGHUP shutdown returns `129`. Forced
+cleanup after a second Ctrl-C or the 10-second deadline returns `137`.
 
 ## Implementation Boundary
 
@@ -84,7 +90,8 @@ that:
    shutdown and sibling shutdown delivery is not duplicated; and
 5. asserts a second SIGINT and the 10-second deadline can each force cleanup;
    and
-6. asserts launcher output contains no traceback.
+6. asserts SIGHUP also removes both siblings; and
+7. asserts launcher output contains no traceback.
 
 Retain the existing tests for opaque advanced overrides, invalid arguments,
 one-child failure, SIGINT cleanup, and SIGTERM cleanup. Then rerun the real
