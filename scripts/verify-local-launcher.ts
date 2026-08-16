@@ -77,7 +77,11 @@ function startLauncher(backend: string, frontend: string, args: string[] = []) {
 	});
 }
 
-function recordingChildCommand(pidPath: string, signalPath: string): string {
+function recordingChildCommand(
+	pidPath: string,
+	signalPath: string,
+	exitDelayMs: number | null = 200,
+): string {
 	const program = [
 		"const fs = require('node:fs')",
 		`fs.writeFileSync(${JSON.stringify(pidPath)}, String(process.pid))`,
@@ -85,7 +89,9 @@ function recordingChildCommand(pidPath: string, signalPath: string): string {
 		"for (const signal of ['SIGINT', 'SIGTERM', 'SIGHUP']) {",
 		"  process.on(signal, () => {",
 		`    fs.appendFileSync(${JSON.stringify(signalPath)}, signal + '\\n')`,
-		"    exitTimer ??= setTimeout(() => process.exit(0), 200)",
+		exitDelayMs === null
+			? "    void exitTimer"
+			: `    exitTimer ??= setTimeout(() => process.exit(0), ${exitDelayMs})`,
 		"  })",
 		"}",
 		"setInterval(() => {}, 1_000)",
@@ -94,7 +100,15 @@ function recordingChildCommand(pidPath: string, signalPath: string): string {
 	return `exec node -e 'eval(Buffer.from("${encoded}", "base64").toString())'`;
 }
 
-function startTerminalLauncher(backend: string, frontend: string) {
+function orphaningChildCommand(pidPath: string, signalPath: string): string {
+	return `${recordingChildCommand(pidPath, signalPath)} </dev/null >/dev/null 2>&1 & sleep 0.2; exit 0`;
+}
+
+function startTerminalLauncher(
+	backend: string,
+	frontend: string,
+	graceSeconds = 0.25,
+) {
 	const child = spawn("bash", ["scripts/run-local-codex.sh"], {
 		cwd: root,
 		detached: true,
@@ -103,7 +117,7 @@ function startTerminalLauncher(backend: string, frontend: string) {
 			PATH: `${path.join(root, "node_modules", ".bin")}:${process.env.PATH ?? ""}`,
 			LOCAL_BACKEND_COMMAND: backend,
 			LOCAL_FRONTEND_COMMAND: frontend,
-			LOCAL_LAUNCHER_GRACE_SECONDS: "0.25",
+			LOCAL_LAUNCHER_GRACE_SECONDS: String(graceSeconds),
 		},
 		stdio: ["ignore", "pipe", "pipe"],
 	});
@@ -128,6 +142,72 @@ function startTerminalLauncher(backend: string, frontend: string) {
 	return { pid: child.pid, exited };
 }
 
+async function waitForSignal(pathname: string, expected: NodeJS.Signals) {
+	const deadline = Date.now() + 5_000;
+	while (Date.now() < deadline) {
+		if (
+			existsSync(pathname) &&
+			readFileSync(pathname, "utf8").split("\n").includes(expected)
+		) {
+			return;
+		}
+		await Bun.sleep(25);
+	}
+	throw new Error(`Timed out waiting for ${expected} at ${pathname}`);
+}
+
+async function verifyOwnedTerminalSignal(
+	terminalSignal: NodeJS.Signals,
+	expectedChildSignal: NodeJS.Signals,
+	expectedExitCode: number,
+) {
+	const directory = mkdtempSync(
+		path.join(tmpdir(), "voice-acp-launcher-terminal-"),
+	);
+	try {
+		const backendPidPath = path.join(directory, "backend.pid");
+		const frontendPidPath = path.join(directory, "frontend.pid");
+		const backendSignals = path.join(directory, "backend.signals");
+		const frontendSignals = path.join(directory, "frontend.signals");
+		const launcherProcess = startTerminalLauncher(
+			recordingChildCommand(backendPidPath, backendSignals),
+			recordingChildCommand(frontendPidPath, frontendSignals),
+		);
+		const [backendPid, frontendPid] = await Promise.all([
+			waitForPid(backendPidPath),
+			waitForPid(frontendPidPath),
+		]);
+
+		process.kill(-launcherProcess.pid, terminalSignal);
+		const result = await launcherProcess.exited;
+
+		assert(
+			result.code === expectedExitCode && result.signal === null,
+			`terminal ${terminalSignal} should be owned and return status ${expectedExitCode}`,
+		);
+		assert(
+			!result.output.includes("Traceback"),
+			`terminal ${terminalSignal} should not print a traceback`,
+		);
+		const observedBackendSignals = readFileSync(backendSignals, "utf8").trim();
+		const observedFrontendSignals = readFileSync(
+			frontendSignals,
+			"utf8",
+		).trim();
+		assert(
+			observedBackendSignals === expectedChildSignal,
+			`backend should receive one ${expectedChildSignal}, received ${JSON.stringify(observedBackendSignals)}`,
+		);
+		assert(
+			observedFrontendSignals === expectedChildSignal,
+			`frontend should receive one ${expectedChildSignal}, received ${JSON.stringify(observedFrontendSignals)}`,
+		);
+		await Promise.all([waitForExit(backendPid), waitForExit(frontendPid)]);
+	} finally {
+		rmSync(directory, { recursive: true, force: true });
+	}
+}
+
 const overrideProcess = startLauncher(
 	`sh -c 'test "$VOICE_ACP_WORKSPACE" = "/tmp/voice acp workspace" && test "$VOICE_ACP_COMMAND_JSON" = "[\\"custom-acp\\",\\"--stdio\\"]"'`,
 	"sh -c 'trap \"exit 0\" INT TERM; while :; do sleep 1; done'",
@@ -149,6 +229,27 @@ const invalidArgumentProcess = startLauncher("exit 0", "exit 0", [
 assert(
 	(await invalidArgumentProcess.exited) !== 0,
 	"unknown launcher arguments should fail closed",
+);
+
+const missingConcurrentlyProcess = Bun.spawn({
+	cmd: ["/usr/bin/python3", "scripts/supervise-local.py", "true", "true"],
+	cwd: root,
+	env: { ...process.env, PATH: "/usr/bin:/bin" },
+	stdout: "pipe",
+	stderr: "pipe",
+});
+const missingConcurrentlyExit = await missingConcurrentlyProcess.exited;
+const missingConcurrentlyError = await new Response(
+	missingConcurrentlyProcess.stderr,
+).text();
+assert(
+	missingConcurrentlyExit === 127,
+	"a missing concurrently executable should return 127",
+);
+assert(
+	missingConcurrentlyError.trim() ===
+		"Could not start the local process supervisor: concurrently was not found",
+	"a missing concurrently executable should return one bounded diagnostic",
 );
 
 const failedChildDirectory = mkdtempSync(
@@ -206,23 +307,25 @@ for (const signal of ["SIGINT", "SIGTERM"] as const) {
 	}
 }
 
-const terminalInterruptDirectory = mkdtempSync(
-	path.join(tmpdir(), "voice-acp-launcher-terminal-"),
+await verifyOwnedTerminalSignal("SIGINT", "SIGINT", 130);
+await verifyOwnedTerminalSignal("SIGTERM", "SIGTERM", 143);
+await verifyOwnedTerminalSignal("SIGHUP", "SIGTERM", 129);
+
+const forcedInterruptDirectory = mkdtempSync(
+	path.join(tmpdir(), "voice-acp-launcher-forced-interrupt-"),
 );
 try {
-	const backendPidPath = path.join(terminalInterruptDirectory, "backend.pid");
-	const frontendPidPath = path.join(terminalInterruptDirectory, "frontend.pid");
-	const backendSignals = path.join(
-		terminalInterruptDirectory,
-		"backend.signals",
-	);
+	const backendPidPath = path.join(forcedInterruptDirectory, "backend.pid");
+	const frontendPidPath = path.join(forcedInterruptDirectory, "frontend.pid");
+	const backendSignals = path.join(forcedInterruptDirectory, "backend.signals");
 	const frontendSignals = path.join(
-		terminalInterruptDirectory,
+		forcedInterruptDirectory,
 		"frontend.signals",
 	);
 	const launcherProcess = startTerminalLauncher(
-		recordingChildCommand(backendPidPath, backendSignals),
-		recordingChildCommand(frontendPidPath, frontendSignals),
+		recordingChildCommand(backendPidPath, backendSignals, null),
+		recordingChildCommand(frontendPidPath, frontendSignals, null),
+		5,
 	);
 	const [backendPid, frontendPid] = await Promise.all([
 		waitForPid(backendPidPath),
@@ -230,29 +333,83 @@ try {
 	]);
 
 	process.kill(-launcherProcess.pid, "SIGINT");
+	await Promise.all([
+		waitForSignal(backendSignals, "SIGINT"),
+		waitForSignal(frontendSignals, "SIGINT"),
+	]);
+	process.kill(-launcherProcess.pid, "SIGINT");
 	const result = await launcherProcess.exited;
 
 	assert(
-		result.code === 130 && result.signal === null,
-		"terminal SIGINT should be owned and return status 130",
-	);
-	assert(
-		!result.output.includes("Traceback"),
-		"terminal SIGINT should not print a traceback",
-	);
-	const observedBackendSignals = readFileSync(backendSignals, "utf8").trim();
-	const observedFrontendSignals = readFileSync(frontendSignals, "utf8").trim();
-	assert(
-		observedBackendSignals === "SIGINT",
-		`backend should receive one SIGINT, received ${JSON.stringify(observedBackendSignals)}`,
-	);
-	assert(
-		observedFrontendSignals === "SIGINT",
-		`frontend should receive one SIGINT, received ${JSON.stringify(observedFrontendSignals)}`,
+		result.code === 137 && result.signal === null,
+		"a second terminal SIGINT should force cleanup and return 137",
 	);
 	await Promise.all([waitForExit(backendPid), waitForExit(frontendPid)]);
 } finally {
-	rmSync(terminalInterruptDirectory, { recursive: true, force: true });
+	rmSync(forcedInterruptDirectory, { recursive: true, force: true });
+}
+
+const deadlineDirectory = mkdtempSync(
+	path.join(tmpdir(), "voice-acp-launcher-deadline-"),
+);
+try {
+	const backendPidPath = path.join(deadlineDirectory, "backend.pid");
+	const frontendPidPath = path.join(deadlineDirectory, "frontend.pid");
+	const backendSignals = path.join(deadlineDirectory, "backend.signals");
+	const frontendSignals = path.join(deadlineDirectory, "frontend.signals");
+	const launcherProcess = startTerminalLauncher(
+		recordingChildCommand(backendPidPath, backendSignals, null),
+		recordingChildCommand(frontendPidPath, frontendSignals, null),
+		0.25,
+	);
+	const [backendPid, frontendPid] = await Promise.all([
+		waitForPid(backendPidPath),
+		waitForPid(frontendPidPath),
+	]);
+
+	process.kill(-launcherProcess.pid, "SIGTERM");
+	const result = await launcherProcess.exited;
+
+	assert(
+		result.code === 137 && result.signal === null,
+		"the graceful deadline should force cleanup and return 137",
+	);
+	await Promise.all([waitForExit(backendPid), waitForExit(frontendPid)]);
+} finally {
+	rmSync(deadlineDirectory, { recursive: true, force: true });
+}
+
+const residualDirectory = mkdtempSync(
+	path.join(tmpdir(), "voice-acp-launcher-residual-"),
+);
+let residualPid: number | null = null;
+try {
+	const residualPidPath = path.join(residualDirectory, "residual.pid");
+	const residualSignals = path.join(residualDirectory, "residual.signals");
+	const launcherProcess = startTerminalLauncher(
+		orphaningChildCommand(residualPidPath, residualSignals),
+		"sleep 30",
+	);
+	residualPid = await waitForPid(residualPidPath);
+
+	const result = await launcherProcess.exited;
+
+	assert(
+		result.code === 0 && result.signal === null,
+		"normal root completion should preserve status zero",
+	);
+	await waitForExit(residualPid);
+	assert(
+		readFileSync(residualSignals, "utf8").trim() === "SIGTERM",
+		"a residual descendant should receive one cleanup SIGTERM",
+	);
+} finally {
+	if (residualPid !== null) {
+		try {
+			process.kill(residualPid, "SIGKILL");
+		} catch {}
+	}
+	rmSync(residualDirectory, { recursive: true, force: true });
 }
 
 console.log("Local launcher cleanup integration checks passed");
