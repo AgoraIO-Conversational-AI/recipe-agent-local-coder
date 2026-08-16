@@ -15,6 +15,7 @@ from collections.abc import Sequence
 
 GRACE_SECONDS = 10.0
 RESIDUAL_GRACE_SECONDS = 0.5
+FORCE_INTERRUPT_DELAY_SECONDS = 0.5
 SIGNAL_EXIT_CODES = {
     signal.SIGHUP: 129,
     signal.SIGINT: 130,
@@ -61,14 +62,22 @@ def supervise(
 ) -> int:
     """Run concurrently in an isolated session and own terminal shutdown."""
     received_signal: signal.Signals | None = None
+    received_signal_at: float | None = None
     force_requested = False
 
     def receive_signal(signum: int, _frame: object) -> None:
-        nonlocal received_signal, force_requested
+        nonlocal received_signal, received_signal_at, force_requested
         current = signal.Signals(signum)
         if received_signal is None:
             received_signal = current
-        elif current == signal.SIGINT:
+            received_signal_at = time.monotonic()
+        elif (
+            current == signal.SIGINT
+            and received_signal_at is not None
+            # bun run can forward one terminal gesture after direct delivery.
+            and time.monotonic() - received_signal_at
+            >= FORCE_INTERRUPT_DELAY_SECONDS
+        ):
             force_requested = True
 
     handled_signals = (signal.SIGHUP, signal.SIGINT, signal.SIGTERM)

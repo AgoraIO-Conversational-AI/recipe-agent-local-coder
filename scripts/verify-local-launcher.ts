@@ -8,6 +8,8 @@ function assert(condition: unknown, message: string): asserts condition {
 }
 
 const root = process.cwd();
+const python3 = Bun.which("python3");
+assert(python3, "launcher verification requires python3");
 const packageJson = JSON.parse(
 	readFileSync(path.join(root, "package.json"), "utf8"),
 ) as {
@@ -232,7 +234,7 @@ assert(
 );
 
 const missingConcurrentlyProcess = Bun.spawn({
-	cmd: ["/usr/bin/python3", "scripts/supervise-local.py", "true", "true"],
+	cmd: [python3, "scripts/supervise-local.py", "true", "true"],
 	cwd: root,
 	env: { ...process.env, PATH: "/usr/bin:/bin" },
 	stdout: "pipe",
@@ -311,6 +313,49 @@ await verifyOwnedTerminalSignal("SIGINT", "SIGINT", 130);
 await verifyOwnedTerminalSignal("SIGTERM", "SIGTERM", 143);
 await verifyOwnedTerminalSignal("SIGHUP", "SIGTERM", 129);
 
+const duplicateBurstDirectory = mkdtempSync(
+	path.join(tmpdir(), "voice-acp-launcher-duplicate-burst-"),
+);
+try {
+	const backendPidPath = path.join(duplicateBurstDirectory, "backend.pid");
+	const frontendPidPath = path.join(duplicateBurstDirectory, "frontend.pid");
+	const backendSignals = path.join(duplicateBurstDirectory, "backend.signals");
+	const frontendSignals = path.join(
+		duplicateBurstDirectory,
+		"frontend.signals",
+	);
+	const launcherProcess = startTerminalLauncher(
+		recordingChildCommand(backendPidPath, backendSignals),
+		recordingChildCommand(frontendPidPath, frontendSignals),
+		2,
+	);
+	const [backendPid, frontendPid] = await Promise.all([
+		waitForPid(backendPidPath),
+		waitForPid(frontendPidPath),
+	]);
+
+	process.kill(-launcherProcess.pid, "SIGINT");
+	await Bun.sleep(50);
+	process.kill(-launcherProcess.pid, "SIGINT");
+	const result = await launcherProcess.exited;
+
+	assert(
+		result.code === 130 && result.signal === null,
+		"one terminal interrupt burst should remain graceful and return 130",
+	);
+	assert(
+		readFileSync(backendSignals, "utf8").trim() === "SIGINT",
+		"a duplicate terminal burst should reach the backend once",
+	);
+	assert(
+		readFileSync(frontendSignals, "utf8").trim() === "SIGINT",
+		"a duplicate terminal burst should reach the frontend once",
+	);
+	await Promise.all([waitForExit(backendPid), waitForExit(frontendPid)]);
+} finally {
+	rmSync(duplicateBurstDirectory, { recursive: true, force: true });
+}
+
 const forcedInterruptDirectory = mkdtempSync(
 	path.join(tmpdir(), "voice-acp-launcher-forced-interrupt-"),
 );
@@ -337,6 +382,7 @@ try {
 		waitForSignal(backendSignals, "SIGINT"),
 		waitForSignal(frontendSignals, "SIGINT"),
 	]);
+	await Bun.sleep(600);
 	process.kill(-launcherProcess.pid, "SIGINT");
 	const result = await launcherProcess.exited;
 
