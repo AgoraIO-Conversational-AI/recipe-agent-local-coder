@@ -39,8 +39,10 @@ assert(
 async function waitForPid(pathname: string): Promise<number> {
 	const deadline = Date.now() + 5_000;
 	while (Date.now() < deadline) {
-		if (existsSync(pathname))
-			return Number(readFileSync(pathname, "utf8").trim());
+		if (existsSync(pathname)) {
+			const value = readFileSync(pathname, "utf8").trim();
+			if (/^[1-9]\d*$/.test(value)) return Number(value);
+		}
 		await Bun.sleep(25);
 	}
 	throw new Error(`Timed out waiting for child PID at ${pathname}`);
@@ -58,6 +60,23 @@ async function waitForExit(pid: number): Promise<void> {
 		await Bun.sleep(25);
 	}
 	throw new Error(`Timed out waiting for child ${pid} to exit`);
+}
+
+const partialPidDirectory = mkdtempSync(
+	path.join(tmpdir(), "voice-acp-launcher-partial-pid-"),
+);
+try {
+	const partialPidPath = path.join(partialPidDirectory, "child.pid");
+	await Bun.write(partialPidPath, "");
+	const eventualPid = waitForPid(partialPidPath);
+	await Bun.sleep(50);
+	await Bun.write(partialPidPath, String(process.pid));
+	assert(
+		(await eventualPid) === process.pid,
+		"PID polling should ignore a created but not-yet-populated file",
+	);
+} finally {
+	rmSync(partialPidDirectory, { recursive: true, force: true });
 }
 
 function childCommand(pidPath: string, body: string): string {
