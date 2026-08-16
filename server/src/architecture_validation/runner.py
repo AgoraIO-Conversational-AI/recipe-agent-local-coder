@@ -156,6 +156,31 @@ def _active_session(loopback_server):
     return loopback_server.agent.active_validation_session()
 
 
+async def wait_for_active_session(loopback_server):
+    active = _active_session(loopback_server)
+    while active is None:
+        await _prompt(
+            "Start or re-enter the browser voice conversation, then press Enter. "
+        )
+        active = _active_session(loopback_server)
+    return active
+
+
+async def stop_current_active_session(loopback_server) -> str | None:
+    active = _active_session(loopback_server)
+    if active is None or loopback_server.agent is None:
+        return None
+    agent_id = active[0]
+    await loopback_server.agent.stop(agent_id)
+    return agent_id
+
+
+def scenario_repetitions(scenario: dict[str, Any], *, smoke: bool) -> int:
+    if smoke:
+        return 1
+    return 10 if scenario["safety_critical"] else 3
+
+
 async def _wait_for_servers(servers: list[uvicorn.Server]) -> None:
     for _ in range(100):
         if all(server.started for server in servers):
@@ -225,7 +250,7 @@ async def verify_public_route_isolation(
     return observations
 
 
-async def run_live(path: VoiceLlmPath) -> int:
+async def run_live(path: VoiceLlmPath, *, smoke: bool = False) -> int:
     load_dotenv(Path(__file__).parents[2] / ".env.local", override=False)
     config = ValidationConfig.from_env()
     if config.path != path:
@@ -266,10 +291,7 @@ async def run_live(path: VoiceLlmPath) -> int:
         route_observations = await verify_public_route_isolation(config)
         print("Public route isolation: passed")
         print("Start the web client with: bun run dev:frontend")
-        await _prompt("Start one voice conversation in the browser, then press Enter. ")
-        active = _active_session(loopback_server)
-        if active is None:
-            raise RuntimeError("no active Agora agent session was found")
+        active = await wait_for_active_session(loopback_server)
         active_agent_id, binding, managed_session = active
 
         from agent import VOICE_SYSTEM_MESSAGES
@@ -283,12 +305,14 @@ async def run_live(path: VoiceLlmPath) -> int:
         recorder = EvidenceRecorder(RESULTS_DIR / f"{path}.jsonl")
         completed = recorder.completed_trial_ids()
         for scenario in corpus["scenarios"]:
-            repetitions = 10 if scenario["safety_critical"] else 3
+            repetitions = scenario_repetitions(scenario, smoke=smoke)
             for repetition in range(1, repetitions + 1):
                 trial_id = f"{path}:{scenario['id']}:{repetition}"
                 if trial_id in completed:
                     continue
                 while True:
+                    active = await wait_for_active_session(loopback_server)
+                    active_agent_id, binding, managed_session = active
                     pending = await prepare_scenario(scenario, binding)
                     if path == "managed":
                         await managed_synchronizer.on_permission_changed(
@@ -455,24 +479,23 @@ async def run_live(path: VoiceLlmPath) -> int:
         return 0
     finally:
         stop_error = None
-        if active_agent_id is not None and loopback_server.agent is not None:
-            try:
-                await loopback_server.agent.stop(active_agent_id)
-            except Exception as exc:
-                stop_error = exc
-                if recorder is not None:
-                    recorder.append(
-                        {
-                            "trial_id": f"{path}:cleanup:{time.time_ns()}",
-                            "path": path,
-                            "scenario_id": "cleanup",
-                            "invalidated": True,
-                            "invalidation_reason": "agent stop failed",
-                            "errors": {
-                                "rest": [type(exc).__name__],
-                            },
-                        }
-                    )
+        try:
+            await stop_current_active_session(loopback_server)
+        except Exception as exc:
+            stop_error = exc
+            if recorder is not None:
+                recorder.append(
+                    {
+                        "trial_id": f"{path}:cleanup:{time.time_ns()}",
+                        "path": path,
+                        "scenario_id": "cleanup",
+                        "invalidated": True,
+                        "invalidation_reason": "agent stop failed",
+                        "errors": {
+                            "rest": [type(exc).__name__],
+                        },
+                    }
+                )
         for server in servers:
             server.should_exit = True
         await asyncio.gather(*tasks, return_exceptions=True)
@@ -483,8 +506,9 @@ async def run_live(path: VoiceLlmPath) -> int:
 def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--path", choices=("managed", "custom"), required=True)
+    parser.add_argument("--smoke", action="store_true")
     args = parser.parse_args()
-    return asyncio.run(run_live(args.path))
+    return asyncio.run(run_live(args.path, smoke=args.smoke))
 
 
 if __name__ == "__main__":

@@ -58,6 +58,8 @@ Complete the prompted trials, including the explicit reconnect and speech-interr
 bun run validate:report
 ```
 
+Before the full matrix, run `bun run validate:managed:smoke` and `bun run validate:custom:smoke`. Smoke mode runs every scenario once; those `:1` trial IDs are retained and count toward the later full matrix. If the browser ends a voice conversation between trials, the runner waits for a new conversation and resumes with its new per-session capabilities instead of discarding completed evidence.
+
 Raw JSONL and rendered reports remain under `validation/results/` and are gitignored. Stop the frontend, runner, and ngrok when finished. The validation harness is not a production runtime.
 
 The report remains inconclusive until each path has at least three scored runs of every ordinary scenario and ten scored runs of every safety-critical scenario. A partial matrix can never select a winner.
