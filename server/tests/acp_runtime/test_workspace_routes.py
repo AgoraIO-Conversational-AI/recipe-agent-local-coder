@@ -64,6 +64,16 @@ def make_app(tmp_path, switch_guard=None):
     return app, picker, runtime, fake_acp
 
 
+def wait_for_browse(client: TestClient, operation_id: str) -> dict:
+    for _ in range(50):
+        response = client.get(f"/local/workspace/browse/{operation_id}")
+        assert response.status_code == 200
+        data = response.json()["data"]
+        if data["state"] != "picking":
+            return data
+    raise AssertionError("Project Folder picker operation did not complete")
+
+
 def test_get_workspace_returns_unconfigured_envelope(tmp_path):
     app, _picker, _runtime, _fake_acp = make_app(tmp_path)
 
@@ -94,6 +104,7 @@ def test_workspace_routes_are_loopback_only(tmp_path):
         assert remote.get("/local/workspace").status_code == 403
         assert remote.get("/local/runtime").status_code == 403
         assert remote.post("/local/workspace/browse").status_code == 403
+        assert remote.get("/local/workspace/browse/operation-a").status_code == 403
         assert (
             remote.put("/local/workspace", json={"path": "/tmp"}).status_code
             == 403
@@ -108,14 +119,17 @@ def test_browse_persists_only_picker_result(tmp_path):
     picker.result = str(project)
 
     with TestClient(app) as client:
-        response = client.post("/local/workspace/browse")
+        started = client.post("/local/workspace/browse")
+        response = wait_for_browse(client, started.json()["data"]["operation_id"])
         restored = client.get("/local/workspace")
 
-    assert response.status_code == 200
-    assert response.json()["data"]["workspace"]["primary_directory"] == str(
+    assert started.status_code == 202
+    assert started.json()["data"]["state"] == "picking"
+    assert response["state"] == "ready"
+    assert response["workspace"]["workspace"]["primary_directory"] == str(
         project.resolve()
     )
-    assert restored.json()["data"] == response.json()["data"]
+    assert restored.json()["data"] == response["workspace"]
     assert picker.calls == 1
     assert runtime.status().state == "ready"
 
@@ -128,12 +142,14 @@ def test_cancelled_picker_does_not_replace_selection(tmp_path):
     with TestClient(app) as client:
         selected = client.put("/local/workspace", json={"path": str(project)})
         picker.result = None
-        cancelled = client.post("/local/workspace/browse")
+        started = client.post("/local/workspace/browse")
+        cancelled = wait_for_browse(client, started.json()["data"]["operation_id"])
         restored = client.get("/local/workspace")
 
     assert selected.status_code == 200
-    assert cancelled.status_code == 409
-    assert cancelled.json()["detail"] == "Project Folder selection was cancelled"
+    assert started.status_code == 202
+    assert cancelled["state"] == "cancelled"
+    assert cancelled["error"] == "Project Folder selection was cancelled"
     assert restored.json()["data"] == selected.json()["data"]
 
 

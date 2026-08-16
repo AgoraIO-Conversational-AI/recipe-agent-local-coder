@@ -7,6 +7,13 @@ from typing import Literal, Protocol
 from fastapi import APIRouter, HTTPException, Request
 from pydantic import BaseModel
 
+from .browse import (
+    BrowseAlreadyActive,
+    BrowseOperationNotFound,
+    BrowseOperationStatus,
+    BrowseSelectionFailed,
+    WorkspaceBrowseCoordinator,
+)
 from .loopback import require_loopback
 from .picker import DirectoryPicker
 from .readiness import LocalRuntimeCoordinator
@@ -40,7 +47,7 @@ class AllowWorkspaceSwitch:
         return None
 
 
-def _envelope(status: WorkspaceStatus) -> dict[str, object]:
+def _envelope(status: WorkspaceStatus | BrowseOperationStatus) -> dict[str, object]:
     return {
         "code": 0,
         "msg": "success",
@@ -58,28 +65,51 @@ def build_workspace_router(
     router = APIRouter(prefix="/local/workspace", include_in_schema=False)
     resolved_guard = switch_guard or AllowWorkspaceSwitch()
 
+    async def select_for_browse(path: str) -> WorkspaceStatus:
+        try:
+            return await _select_and_activate_status(
+                service, runtime, resolved_guard, path
+            )
+        except HTTPException as exc:
+            raise BrowseSelectionFailed(
+                "Could not select the Project Folder"
+            ) from exc
+
+    browse_coordinator = WorkspaceBrowseCoordinator(picker, select_for_browse)
+
     @router.get("")
     async def get_workspace(request: Request) -> dict[str, object]:
         require_loopback(request)
         return _envelope(service.status())
 
-    @router.post("/browse")
+    @router.post("/browse", status_code=202)
     async def browse_workspace(request: Request) -> dict[str, object]:
         require_loopback(request)
-        selected = await picker.pick()
-        if selected is None:
-            raise HTTPException(
-                status_code=409,
-                detail="Project Folder selection was cancelled",
-            )
-        return await _select_and_activate(service, runtime, resolved_guard, selected)
+        try:
+            return _envelope(browse_coordinator.start())
+        except BrowseAlreadyActive as exc:
+            raise HTTPException(status_code=409, detail=str(exc)) from exc
+
+    @router.get("/browse/{operation_id}")
+    async def get_browse_operation(
+        operation_id: str, request: Request
+    ) -> dict[str, object]:
+        require_loopback(request)
+        try:
+            return _envelope(browse_coordinator.status(operation_id))
+        except BrowseOperationNotFound as exc:
+            raise HTTPException(status_code=404, detail=str(exc)) from exc
 
     @router.put("")
     async def select_workspace(
         payload: SelectWorkspaceRequest, request: Request
     ) -> dict[str, object]:
         require_loopback(request)
-        return await _select_and_activate(service, runtime, resolved_guard, payload.path)
+        return _envelope(
+            await _select_and_activate_status(
+                service, runtime, resolved_guard, payload.path
+            )
+        )
 
     @router.delete("")
     async def clear_workspace(request: Request) -> dict[str, object]:
@@ -119,12 +149,12 @@ def build_runtime_router(*, runtime: LocalRuntimeCoordinator) -> APIRouter:
     return router
 
 
-async def _select_and_activate(
+async def _select_and_activate_status(
     service: WorkspaceService,
     runtime: LocalRuntimeCoordinator,
     switch_guard: WorkspaceSwitchGuard,
     path: str,
-) -> dict[str, object]:
+) -> WorkspaceStatus:
     """Persist a new folder only when its replacement ACP session is ready."""
     previous = service.status()
     conflict = switch_guard.check(
@@ -139,7 +169,7 @@ async def _select_and_activate(
 
     readiness = await runtime.activate_workspace()
     if readiness.state == "ready":
-        return _envelope(selected)
+        return selected
 
     service.restore(previous)
     raise HTTPException(
