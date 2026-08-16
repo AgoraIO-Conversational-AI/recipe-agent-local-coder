@@ -31,6 +31,15 @@ environment contract. It delegates only process-group lifecycle to the
 supervisor. Backend and frontend commands, ports, Workspace persistence, ACP
 configuration, and Agora behavior do not change.
 
+`concurrently` remains in the process tree. It continues to own labeled output,
+child fail-fast behavior, and sibling shutdown. Replacing it would require the
+supervisor to duplicate log multiplexing and child race handling. The two
+layers have non-overlapping responsibilities:
+
+```text
+Terminal -> Local Launcher Supervisor -> concurrently -> backend + frontend
+```
+
 ## Signal and Exit Contract
 
 - Normal child completion preserves the existing `concurrently --success first`
