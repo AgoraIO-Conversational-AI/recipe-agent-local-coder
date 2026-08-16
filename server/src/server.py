@@ -69,7 +69,12 @@ except ValueError as e:
 
 # Local ACP readiness has its own lifecycle and does not start an Agora session.
 workspace_service = WorkspaceService(WorkspaceConfigStore.default())
-apply_workspace_override(workspace_service, os.environ)
+try:
+    apply_workspace_override(workspace_service, os.environ)
+except ValueError as exc:
+    # A bad VOICE_ACP_WORKSPACE must not crash import; surface a clear warning
+    # and leave the workspace unconfigured.
+    logger.warning("Ignoring VOICE_ACP_WORKSPACE override: %s", exc)
 local_runtime = LocalRuntimeCoordinator(workspace_service, CodexAcpClient())
 
 
@@ -81,22 +86,6 @@ async def local_runtime_lifespan(_app: FastAPI):
     finally:
         await local_runtime.close()
 
-
-# FastAPI application
-app = FastAPI(
-    title="Agora Agent & Token Service",
-    version="2.0.0",
-    description="Agora Conversational AI service",
-    lifespan=local_runtime_lifespan,
-)
-
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
 
 router = APIRouter()
 
@@ -219,16 +208,47 @@ async def stop_agent(request: StopAgentRequest):
         raise _to_http_error(e)
 
 
-app.include_router(router)
-app.include_router(
-    build_workspace_router(
-        service=workspace_service,
-        picker=MacOSDirectoryPicker(),
-        runtime=local_runtime,
+def local_routes_enabled(env=os.environ) -> bool:
+    """Whether to mount the loopback-only derivative routes.
+
+    Ordinary and public deployments expose only the three stable quickstart
+    routes. The derivative ``/local/*`` and ``/validation/admin/*`` surfaces
+    mount only under the same ``VOICE_ACP_LOCAL_RUNTIME`` opt-in the web
+    rewrites use, so ``AGENT_BACKEND_URL`` alone never exposes them.
+    """
+    return env.get("VOICE_ACP_LOCAL_RUNTIME") == "1"
+
+
+def create_app(*, enable_local_routes: bool) -> FastAPI:
+    """Compose the FastAPI app; loopback routes mount only when opted in."""
+    application = FastAPI(
+        title="Agora Agent & Token Service",
+        version="2.0.0",
+        description="Agora Conversational AI service",
+        lifespan=local_runtime_lifespan,
     )
-)
-app.include_router(build_runtime_router(runtime=local_runtime))
-app.include_router(build_admin_router(store=state_store))
+    application.add_middleware(
+        CORSMiddleware,
+        allow_origins=["*"],
+        allow_credentials=True,
+        allow_methods=["*"],
+        allow_headers=["*"],
+    )
+    application.include_router(router)
+    if enable_local_routes:
+        application.include_router(
+            build_workspace_router(
+                service=workspace_service,
+                picker=MacOSDirectoryPicker(),
+                runtime=local_runtime,
+            )
+        )
+        application.include_router(build_runtime_router(runtime=local_runtime))
+        application.include_router(build_admin_router(store=state_store))
+    return application
+
+
+app = create_app(enable_local_routes=local_routes_enabled())
 
 
 if __name__ == "__main__":

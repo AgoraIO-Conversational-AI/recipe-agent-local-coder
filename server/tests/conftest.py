@@ -72,6 +72,9 @@ class FakeAgent:
 def server_module(fake_env, monkeypatch, tmp_path):
     """Import server.py fresh, with the fake env + neutralized dotenv applied."""
     monkeypatch.setenv("VOICE_ACP_STATE_DIR", str(tmp_path / "voice-acp-state"))
+    # Build the module-level app with the loopback derivative routes opted in,
+    # matching the local Codex development runtime the routes exist for.
+    monkeypatch.setenv("VOICE_ACP_LOCAL_RUNTIME", "1")
     sys.modules.pop("server", None)
     sys.modules.pop("agent", None)
     import server

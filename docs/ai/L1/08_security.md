@@ -83,7 +83,14 @@ If you need real auth, add a FastAPI dependency that validates a header on each 
 
 ## Local Codex Boundary
 
-- `/local/workspace`, `/local/workspace/browse`, and `/local/runtime` call
+- `/local/workspace`, `/local/workspace/browse`, `/local/runtime`, and
+  `/validation/admin/*` are registered on the FastAPI app only when
+  `server.create_app(enable_local_routes=True)` — i.e. when
+  `VOICE_ACP_LOCAL_RUNTIME=1`. Ordinary and public deployments build the default
+  app, which mounts only the three stable quickstart routes, so these routes
+  return 404 there rather than depending solely on `require_loopback`. This is
+  the backend counterpart to the Next `/api/local/*` rewrite opt-in.
+- When they are mounted, `/local/*` and `/validation/admin/*` call
   `require_loopback`; they are not public deployment endpoints.
 - `require_loopback` checks the socket peer, the `Origin` header, and the `Host`
   header. The socket-peer check blocks other machines, but a local browser is a

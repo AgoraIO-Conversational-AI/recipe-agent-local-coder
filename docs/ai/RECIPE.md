@@ -123,9 +123,13 @@ advertised ChatGPT method on typed authentication-required and retrying once.
 Advanced `CODEX_PATH`/API-key child pass-through and JSON-argv custom commands
 do not select full access or log their environment.
 
-Next registers `/api/local/*` only for an explicit non-production local-runtime
-opt-in and a loopback backend URL. Normal and public web deployments retain only
-the three stable quickstart rewrites.
+Both ends gate these routes behind the same `VOICE_ACP_LOCAL_RUNTIME=1` opt-in.
+The FastAPI backend mounts `/local/*` and `/validation/admin/*` only through
+`server.create_app(enable_local_routes=True)`; the default app for ordinary and
+public deployments exposes only the three stable quickstart routes. Next
+likewise registers `/api/local/*` only for that non-production local-runtime
+opt-in with a loopback backend URL. Normal and public web deployments retain
+only the three stable quickstart routes and rewrites.
 
 The extension's fake ACP, local proxy, fake FastAPI, and build checks are
 offline-safe. They do not validate real `npx` execution, browser authentication,
