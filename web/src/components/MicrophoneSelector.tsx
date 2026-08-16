@@ -6,12 +6,7 @@ import type { IMicrophoneAudioTrack } from 'agora-rtc-react'
 import { Check, Settings } from 'lucide-react'
 
 import { Button } from '@/components/ui/button'
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu'
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
 
 interface MicrophoneSelectorProps {
   localMicrophoneTrack: IMicrophoneAudioTrack | null
@@ -112,16 +107,16 @@ export function MicrophoneSelector({ localMicrophoneTrack }: MicrophoneSelectorP
     <DropdownMenu open={isOpen} onOpenChange={setIsOpen}>
       <DropdownMenuTrigger asChild>
         <Button
-          variant='ghost'
-          size='icon'
-          className='h-10 w-10 rounded-full border border-border bg-secondary hover:bg-accent/10'
-          title='Select microphone'
+          variant="ghost"
+          size="icon"
+          className="h-10 w-10 rounded-full border border-border bg-secondary hover:bg-accent/10"
+          title="Select microphone"
         >
-          <Settings className='h-4 w-4 text-foreground' />
+          <Settings className="h-4 w-4 text-foreground" />
         </Button>
       </DropdownMenuTrigger>
-      <DropdownMenuContent align='center' className='w-56 border-border bg-popover'>
-        <div className='px-2 py-1.5 text-xs font-medium text-muted-foreground'>Microphone</div>
+      <DropdownMenuContent align="center" className="w-56 border-border bg-popover">
+        <div className="px-2 py-1.5 text-xs font-medium text-muted-foreground">Microphone</div>
         {devices.map((device) => (
           <DropdownMenuItem
             key={device.deviceId}
@@ -132,10 +127,8 @@ export function MicrophoneSelector({ localMicrophoneTrack }: MicrophoneSelectorP
                 : 'cursor-pointer text-foreground hover:bg-accent/10'
             }
           >
-            <span className='truncate'>{device.label}</span>
-            {device.deviceId === currentDeviceId && (
-              <Check className='ml-auto h-3.5 w-3.5 text-primary' />
-            )}
+            <span className="truncate">{device.label}</span>
+            {device.deviceId === currentDeviceId && <Check className="ml-auto h-3.5 w-3.5 text-primary" />}
           </DropdownMenuItem>
         ))}
       </DropdownMenuContent>

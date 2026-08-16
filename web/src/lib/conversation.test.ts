@@ -11,7 +11,6 @@ test("normalizeTranscript remaps uid '0' to the local uid and normalizes text", 
     [
       { uid: '0', text: 'Hi.There', turn_id: '1', status: 0 },
       { uid: '42', text: 'ok', turn_id: '2', status: 0 },
-      // biome-ignore lint/suspicious/noExplicitAny: minimal test fixtures
     ] as any,
     'local-9',
   )

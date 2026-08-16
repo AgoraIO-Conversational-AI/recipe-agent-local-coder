@@ -14,10 +14,7 @@ interface ErrorBoundaryState {
   error?: Error
 }
 
-export class ErrorBoundary extends React.Component<
-  ErrorBoundaryProps,
-  ErrorBoundaryState
-> {
+export class ErrorBoundary extends React.Component<ErrorBoundaryProps, ErrorBoundaryState> {
   constructor(props: ErrorBoundaryProps) {
     super(props)
     this.state = { hasError: false }
@@ -38,12 +35,11 @@ export class ErrorBoundary extends React.Component<
       }
 
       return (
-        <div className='flex min-h-[320px] flex-col items-center justify-center p-8 text-center'>
-          <div className='max-w-md'>
-            <h2 className='mb-4 text-lg font-semibold text-destructive'>Something went wrong</h2>
-            <p className='mb-6 text-sm text-muted-foreground'>
-              An error occurred while loading the conversation. Please try refreshing the
-              page.
+        <div className="flex min-h-[320px] flex-col items-center justify-center p-8 text-center">
+          <div className="max-w-md">
+            <h2 className="mb-4 text-lg font-semibold text-destructive">Something went wrong</h2>
+            <p className="mb-6 text-sm text-muted-foreground">
+              An error occurred while loading the conversation. Please try refreshing the page.
             </p>
             <Button onClick={() => window.location.reload()}>Refresh Page</Button>
           </div>

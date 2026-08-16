@@ -31,13 +31,7 @@ export function getConversationIssueSeverity(issue: ConnectionIssue): Connection
   const msg = issue.message.toLowerCase()
   const code = getEffectiveIssueCode(issue).toLowerCase()
 
-  if (
-    code === '429' ||
-    msg.includes('rate limit') ||
-    msg.includes('timeout') ||
-    code === '408' ||
-    code === '409'
-  ) {
+  if (code === '429' || msg.includes('rate limit') || msg.includes('timeout') || code === '408' || code === '409') {
     return 'warning'
   }
 
@@ -72,12 +66,7 @@ function getCta(issue: ConnectionIssue): string | null {
   if (msg.includes('http 429') || code === '429' || msg.includes('rate limit')) {
     return 'Reduce request rate or increase quota.'
   }
-  if (
-    msg.includes('http 500') ||
-    msg.includes('http 502') ||
-    msg.includes('http 503') ||
-    msg.includes('http 504')
-  ) {
+  if (msg.includes('http 500') || msg.includes('http 502') || msg.includes('http 503') || msg.includes('http 504')) {
     return 'Retry shortly or switch provider region/model.'
   }
   if (msg.includes('websocket') && msg.includes('reject')) {
@@ -101,20 +90,16 @@ export function ConversationErrorCard({ issue }: ConversationErrorCardProps) {
   const showRaw = issue.message !== normalizedMessage
 
   return (
-    <div className='rounded border border-destructive/30 bg-destructive/10 px-2 py-1.5 text-xs'>
-      <div className='font-medium text-destructive'>
-        Conversation AI Engine Error: {transportCode}
-      </div>
-      {normalizedMessage !== issue.message && (
-        <div className='text-foreground'>{normalizedMessage}</div>
-      )}
-      {cta && <div className='text-[11px] text-destructive/90'>{cta}</div>}
+    <div className="rounded border border-destructive/30 bg-destructive/10 px-2 py-1.5 text-xs">
+      <div className="font-medium text-destructive">Conversation AI Engine Error: {transportCode}</div>
+      {normalizedMessage !== issue.message && <div className="text-foreground">{normalizedMessage}</div>}
+      {cta && <div className="text-[11px] text-destructive/90">{cta}</div>}
       {showRaw && (
-        <div className='mt-2 break-words border-t border-destructive/20 pt-2 text-muted-foreground'>
+        <div className="mt-2 break-words border-t border-destructive/20 pt-2 text-muted-foreground">
           {issue.message}
         </div>
       )}
-      <div className='text-muted-foreground'>
+      <div className="text-muted-foreground">
         agent {issue.agentUserId} at {new Date(issue.timestamp).toLocaleTimeString()}
       </div>
     </div>
