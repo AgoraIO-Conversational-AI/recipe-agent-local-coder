@@ -1,5 +1,6 @@
 """Local Workspace Scope and ACP session runtime."""
 
+from .acp_client import AcpClientPort, AcpPermissionRequest, AcpSession, AcpSessionEvent
 from .workspace import (
     AgentProfile,
     WorkspaceConfigStore,
@@ -9,6 +10,10 @@ from .workspace import (
 )
 
 __all__ = [
+    "AcpClientPort",
+    "AcpPermissionRequest",
+    "AcpSession",
+    "AcpSessionEvent",
     "AgentProfile",
     "WorkspaceConfigStore",
     "WorkspaceScope",
