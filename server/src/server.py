@@ -11,6 +11,7 @@ import logging
 import os
 import random
 import time
+from contextlib import asynccontextmanager
 from typing import Any, Dict, Optional
 from dotenv import load_dotenv
 
@@ -24,8 +25,10 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from agora_agent.agentkit.token import generate_convo_ai_token
 from agent import Agent
+from acp_runtime.codex import CodexAcpClient
 from acp_runtime.picker import MacOSDirectoryPicker
-from acp_runtime.routes import build_workspace_router
+from acp_runtime.readiness import LocalRuntimeCoordinator
+from acp_runtime.routes import build_runtime_router, build_workspace_router
 from acp_runtime.workspace import WorkspaceConfigStore, WorkspaceService
 from architecture_validation.admin import build_admin_router
 from architecture_validation.runtime import state_store
@@ -63,11 +66,27 @@ except ValueError as e:
     agent = None
 
 
+# Local ACP readiness has its own lifecycle and does not start an Agora session.
+workspace_service = WorkspaceService(WorkspaceConfigStore.default())
+local_runtime = LocalRuntimeCoordinator(workspace_service, CodexAcpClient())
+
+
+@asynccontextmanager
+async def local_runtime_lifespan(_app: FastAPI):
+    """Open ACP at startup only when a valid Project Folder is already selected."""
+    await local_runtime.start()
+    try:
+        yield
+    finally:
+        await local_runtime.close()
+
+
 # FastAPI application
 app = FastAPI(
     title="Agora Agent & Token Service",
     version="2.0.0",
     description="Agora Conversational AI service",
+    lifespan=local_runtime_lifespan,
 )
 
 app.add_middleware(
@@ -202,10 +221,12 @@ async def stop_agent(request: StopAgentRequest):
 app.include_router(router)
 app.include_router(
     build_workspace_router(
-        service=WorkspaceService(WorkspaceConfigStore.default()),
+        service=workspace_service,
         picker=MacOSDirectoryPicker(),
+        runtime=local_runtime,
     )
 )
+app.include_router(build_runtime_router(runtime=local_runtime))
 app.include_router(build_admin_router(store=state_store))
 
 
@@ -213,4 +234,4 @@ if __name__ == "__main__":
     import uvicorn
 
     port = int(os.getenv("PORT", "8000"))
-    uvicorn.run(app, host="0.0.0.0", port=port)
+    uvicorn.run(app, host=os.getenv("HOST", "0.0.0.0"), port=port)

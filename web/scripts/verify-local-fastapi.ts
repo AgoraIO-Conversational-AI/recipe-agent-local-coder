@@ -169,6 +169,15 @@ async function main() {
       'GET /api/get_config?uid=0 should generate an RTM-safe uid',
     )
 
+    const runtimeResponse = await requestViaRewrite('/api/local/runtime')
+    const runtimeBody = await getJson(runtimeResponse)
+    assert(runtimeResponse.status === 200, 'GET /api/local/runtime should proxy to the FastAPI app')
+    assert(runtimeBody.code === 0, 'GET /api/local/runtime should preserve the FastAPI success payload')
+    assert(
+      (runtimeBody.data as Record<string, unknown> | undefined)?.state === 'configuration_required',
+      'GET /api/local/runtime should not start ACP without a Project Folder',
+    )
+
     const startResponse = await requestViaRewrite('/api/startAgent', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },

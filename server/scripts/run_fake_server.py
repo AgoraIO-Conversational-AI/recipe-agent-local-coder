@@ -1,5 +1,6 @@
 import os
 import sys
+import tempfile
 
 import uvicorn
 
@@ -27,6 +28,8 @@ class FakeAgent:
 
 
 def main():
+    # The local smoke server must not inherit a developer's saved ACP selection.
+    os.environ["VOICE_ACP_STATE_DIR"] = tempfile.mkdtemp(prefix="voice-acp-smoke-")
     server_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
     src_root = os.path.join(server_root, "src")
     if src_root not in sys.path:

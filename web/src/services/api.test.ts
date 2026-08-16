@@ -3,6 +3,7 @@ import { afterEach, expect, test } from 'bun:test'
 import {
   browseWorkspace,
   getConfig,
+  getLocalRuntime,
   getWorkspace,
   selectWorkspace,
   startAgent,
@@ -84,6 +85,33 @@ test('getWorkspace returns the local Workspace status', async () => {
 
   expect(status.state).toBe('unconfigured')
   expect(lastCall.url).toContain('/api/local/workspace')
+  expect(lastCall.init?.method).toBe('GET')
+})
+
+test('getLocalRuntime returns the local Codex readiness state', async () => {
+  mockFetch(200, {
+    code: 0,
+    msg: 'success',
+    data: {
+      state: 'configuration_required',
+      workspace: {
+        state: 'unconfigured',
+        profile: {
+          id: 'codex',
+          label: 'Codex',
+          requires_primary_directory: true,
+          supports_additional_directories: false,
+        },
+        workspace: null,
+      },
+      error: null,
+    },
+  })
+
+  const status = await getLocalRuntime()
+
+  expect(status.state).toBe('configuration_required')
+  expect(lastCall.url).toContain('/api/local/runtime')
   expect(lastCall.init?.method).toBe('GET')
 })
 

@@ -7,6 +7,7 @@ from pydantic import BaseModel
 
 from .loopback import require_loopback
 from .picker import DirectoryPicker
+from .readiness import LocalRuntimeCoordinator
 from .workspace import WorkspaceService, WorkspaceStatus
 
 
@@ -23,7 +24,7 @@ def _envelope(status: WorkspaceStatus) -> dict[str, object]:
 
 
 def build_workspace_router(
-    *, service: WorkspaceService, picker: DirectoryPicker
+    *, service: WorkspaceService, picker: DirectoryPicker, runtime: LocalRuntimeCoordinator
 ) -> APIRouter:
     router = APIRouter(prefix="/local/workspace", include_in_schema=False)
 
@@ -41,24 +42,64 @@ def build_workspace_router(
                 status_code=409,
                 detail="Project Folder selection was cancelled",
             )
-        try:
-            return _envelope(service.select(selected))
-        except ValueError as exc:
-            raise HTTPException(status_code=400, detail=str(exc)) from exc
+        return await _select_and_activate(service, runtime, selected)
 
     @router.put("")
     async def select_workspace(
         payload: SelectWorkspaceRequest, request: Request
     ) -> dict[str, object]:
         require_loopback(request)
-        try:
-            return _envelope(service.select(payload.path))
-        except ValueError as exc:
-            raise HTTPException(status_code=400, detail=str(exc)) from exc
+        return await _select_and_activate(service, runtime, payload.path)
 
     @router.delete("")
     async def clear_workspace(request: Request) -> dict[str, object]:
         require_loopback(request)
+        await runtime.close()
         return _envelope(service.clear())
 
     return router
+
+
+def build_runtime_router(*, runtime: LocalRuntimeCoordinator) -> APIRouter:
+    """Expose local readiness without exposing ACP process details."""
+    router = APIRouter(prefix="/local/runtime", include_in_schema=False)
+
+    @router.get("")
+    async def get_runtime(request: Request) -> dict[str, object]:
+        require_loopback(request)
+        return {
+            "code": 0,
+            "msg": "success",
+            "data": asdict(runtime.status()),
+        }
+
+    return router
+
+
+async def _select_and_activate(
+    service: WorkspaceService, runtime: LocalRuntimeCoordinator, path: str
+) -> dict[str, object]:
+    """Persist a new folder only when its replacement ACP session is ready."""
+    previous = service.status()
+    try:
+        selected = service.select(path)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+    readiness = await runtime.activate_workspace()
+    if readiness.state == "ready":
+        return _envelope(selected)
+
+    _restore_workspace(service, previous)
+    raise HTTPException(
+        status_code=503,
+        detail=readiness.error or "The local Codex runtime is not ready.",
+    )
+
+
+def _restore_workspace(service: WorkspaceService, previous: WorkspaceStatus) -> None:
+    """Undo a persisted switch when its replacement ACP session cannot open."""
+    if previous.workspace is None:
+        service.clear()
+        return
+    service.store.save(previous.workspace)

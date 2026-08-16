@@ -19,6 +19,14 @@ export interface WorkspaceStatus {
   workspace: WorkspaceScope | null
 }
 
+export type LocalRuntimeState = 'configuration_required' | 'starting' | 'authentication_required' | 'ready' | 'failed'
+
+export interface LocalRuntimeStatus {
+  state: LocalRuntimeState
+  workspace: WorkspaceStatus
+  error: string | null
+}
+
 export const CODEX_PROFILE: AgentProfile = {
   id: 'codex',
   label: 'Codex',

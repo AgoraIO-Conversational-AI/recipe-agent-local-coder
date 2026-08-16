@@ -40,6 +40,10 @@ const nextConfig: NextConfig = {
         source: '/api/local/workspace/browse',
         destination: `${backendUrl}/local/workspace/browse`,
       },
+      {
+        source: '/api/local/runtime',
+        destination: `${backendUrl}/local/runtime`,
+      },
     ]
   },
 }

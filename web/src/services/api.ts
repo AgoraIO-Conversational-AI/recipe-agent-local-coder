@@ -1,4 +1,4 @@
-import type { WorkspaceStatus } from '@/lib/workspace'
+import type { LocalRuntimeStatus, WorkspaceStatus } from '@/lib/workspace'
 
 const API_BASE_URL = '/api'
 
@@ -73,26 +73,33 @@ export async function stopAgent(agentId: string): Promise<void> {
 }
 
 async function readWorkspaceResponse(response: Response): Promise<WorkspaceStatus> {
+  return readLocalResponse<WorkspaceStatus>(response, 'Failed to get Project Folder configuration')
+}
+
+async function readLocalResponse<T>(response: Response, fallbackMessage: string): Promise<T> {
   const result = await response.json()
   if (!response.ok) {
     throw new Error(result.detail || `HTTP ${response.status}`)
   }
   if (result.code !== 0 || !result.data) {
-    throw new Error(result.msg || 'Failed to get Project Folder configuration')
+    throw new Error(result.msg || fallbackMessage)
   }
   return result.data
 }
 
 export async function getWorkspace(): Promise<WorkspaceStatus> {
-  return readWorkspaceResponse(
-    await fetch(`${API_BASE_URL}/local/workspace`, { method: 'GET' }),
+  return readWorkspaceResponse(await fetch(`${API_BASE_URL}/local/workspace`, { method: 'GET' }))
+}
+
+export async function getLocalRuntime(): Promise<LocalRuntimeStatus> {
+  return readLocalResponse<LocalRuntimeStatus>(
+    await fetch(`${API_BASE_URL}/local/runtime`, { method: 'GET' }),
+    'Failed to get local Codex runtime readiness',
   )
 }
 
 export async function browseWorkspace(): Promise<WorkspaceStatus> {
-  return readWorkspaceResponse(
-    await fetch(`${API_BASE_URL}/local/workspace/browse`, { method: 'POST' }),
-  )
+  return readWorkspaceResponse(await fetch(`${API_BASE_URL}/local/workspace/browse`, { method: 'POST' }))
 }
 
 export async function selectWorkspace(path: string): Promise<WorkspaceStatus> {
@@ -106,7 +113,5 @@ export async function selectWorkspace(path: string): Promise<WorkspaceStatus> {
 }
 
 export async function clearWorkspace(): Promise<WorkspaceStatus> {
-  return readWorkspaceResponse(
-    await fetch(`${API_BASE_URL}/local/workspace`, { method: 'DELETE' }),
-  )
+  return readWorkspaceResponse(await fetch(`${API_BASE_URL}/local/workspace`, { method: 'DELETE' }))
 }

@@ -5,6 +5,7 @@ import nextConfig from '../next.config'
 import {
   browseWorkspace,
   getConfig,
+  getLocalRuntime,
   getWorkspace,
   selectWorkspace,
   startAgent,
@@ -77,8 +78,7 @@ async function verifyRewriteContract() {
     assert(
       rewrites.some(
         (rewrite) =>
-          rewrite.source === '/api/local/workspace' &&
-          rewrite.destination === 'http://localhost:8000/local/workspace',
+          rewrite.source === '/api/local/workspace' && rewrite.destination === 'http://localhost:8000/local/workspace',
       ),
       'next.config.ts should rewrite /api/local/workspace to the loopback backend',
     )
@@ -89,6 +89,13 @@ async function verifyRewriteContract() {
           rewrite.destination === 'http://localhost:8000/local/workspace/browse',
       ),
       'next.config.ts should rewrite /api/local/workspace/browse to the loopback backend',
+    )
+    assert(
+      rewrites.some(
+        (rewrite) =>
+          rewrite.source === '/api/local/runtime' && rewrite.destination === 'http://localhost:8000/local/runtime',
+      ),
+      'next.config.ts should rewrite /api/local/runtime to the loopback backend',
     )
   } finally {
     if (originalBackendUrl) {
@@ -219,6 +226,32 @@ async function verifyApiClientRequests() {
       })
     }
 
+    if (url.pathname === '/api/local/runtime') {
+      assert(init?.method === 'GET', 'GET /api/local/runtime should use GET')
+      return Response.json({
+        code: 0,
+        data: {
+          state: 'ready',
+          workspace: {
+            state: 'ready',
+            profile: {
+              id: 'codex',
+              label: 'Codex',
+              requires_primary_directory: true,
+              supports_additional_directories: false,
+            },
+            workspace: {
+              id: 'workspace-a',
+              label: 'project',
+              primary_directory: '/tmp/project',
+            },
+          },
+          error: null,
+        },
+        msg: 'success',
+      })
+    }
+
     return Response.json({ detail: `Unexpected request path: ${url.pathname}` }, { status: 404 })
   }) as typeof fetch
 
@@ -235,6 +268,8 @@ async function verifyApiClientRequests() {
     assert(workspace.state === 'ready', 'GET /api/local/workspace should return status')
     await browseWorkspace()
     await selectWorkspace('/tmp/project')
+    const runtime = await getLocalRuntime()
+    assert(runtime.state === 'ready', 'GET /api/local/runtime should return readiness')
 
     assert(
       JSON.stringify(seenPaths) ===
@@ -245,6 +280,7 @@ async function verifyApiClientRequests() {
           '/api/local/workspace',
           '/api/local/workspace/browse',
           '/api/local/workspace',
+          '/api/local/runtime',
         ]),
       'API client should call the unversioned /api paths',
     )

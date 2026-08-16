@@ -6,7 +6,7 @@ import { useEffect, useState } from 'react'
 import { Button } from '@/components/ui/button'
 import type { WorkspaceStatus } from '@/lib/workspace'
 import { workspaceNeedsConfiguration } from '@/lib/workspace'
-import { browseWorkspace, selectWorkspace } from '@/services/api'
+import { browseWorkspace, getLocalRuntime, selectWorkspace } from '@/services/api'
 
 type ProjectFolderSettingsProps = {
   open: boolean
@@ -51,6 +51,10 @@ export function ProjectFolderSettings({
     setError(null)
     try {
       const nextStatus = await select()
+      const runtime = await getLocalRuntime()
+      if (runtime.state !== 'ready') {
+        throw new Error(runtime.error ?? 'The local Codex runtime is not ready')
+      }
       onStatusChange(nextStatus)
     } catch (nextError) {
       setError(nextError instanceof Error ? nextError.message : 'Could not select the Project Folder')

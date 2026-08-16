@@ -95,6 +95,14 @@ async function withStubBackend<T>(run: (baseUrl: string) => Promise<T>) {
       return Response.json({ code: 0, msg: 'success' })
     }
 
+    if (request.method === 'GET' && url.pathname === '/local/runtime') {
+      return Response.json({
+        code: 0,
+        data: { state: 'configuration_required', workspace: { state: 'unconfigured' }, error: null },
+        msg: 'success',
+      })
+    }
+
     return new Response('not found', { status: 404 })
   }
 
@@ -157,6 +165,11 @@ async function main() {
     const stopBody = await getJson(stopResponse)
     assert(stopResponse.status === 200, 'POST /api/stopAgent should proxy successfully')
     assert(stopBody.code === 0, 'POST /api/stopAgent should preserve proxied success payload')
+
+    const runtimeResponse = await requestViaRewrite('/api/local/runtime')
+    const runtimeBody = await getJson(runtimeResponse)
+    assert(runtimeResponse.status === 200, 'GET /api/local/runtime should proxy successfully')
+    assert(runtimeBody.code === 0, 'GET /api/local/runtime should preserve proxied success payload')
   })
 
   if (originalBackendUrl) {
