@@ -46,6 +46,19 @@ class WorkspaceConfigStore:
     def __init__(self, path: Path) -> None:
         self.path = path
 
+    @classmethod
+    def default(cls) -> "WorkspaceConfigStore":
+        state_directory = os.getenv("VOICE_ACP_STATE_DIR")
+        root = (
+            Path(state_directory).expanduser()
+            if state_directory
+            else Path.home()
+            / "Library"
+            / "Application Support"
+            / "Agora Voice ACP"
+        )
+        return cls(root / "workspace.json")
+
     def load(self) -> WorkspaceScope | None:
         if not self.path.exists():
             return None

@@ -24,6 +24,9 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from agora_agent.agentkit.token import generate_convo_ai_token
 from agent import Agent
+from acp_runtime.picker import MacOSDirectoryPicker
+from acp_runtime.routes import build_workspace_router
+from acp_runtime.workspace import WorkspaceConfigStore, WorkspaceService
 from architecture_validation.admin import build_admin_router
 from architecture_validation.runtime import state_store
 
@@ -197,6 +200,12 @@ async def stop_agent(request: StopAgentRequest):
 
 
 app.include_router(router)
+app.include_router(
+    build_workspace_router(
+        service=WorkspaceService(WorkspaceConfigStore.default()),
+        picker=MacOSDirectoryPicker(),
+    )
+)
 app.include_router(build_admin_router(store=state_store))
 
 

@@ -1,7 +1,9 @@
 """Loopback-only controls for seeding reproducible live validation state."""
 
-from fastapi import APIRouter, HTTPException, Request
+from fastapi import APIRouter, Request
 from pydantic import BaseModel
+
+from acp_runtime.loopback import require_loopback
 
 from .state import ValidationStateStore
 
@@ -12,12 +14,6 @@ class SeedPermissionRequest(BaseModel):
     operation: str
 
 
-def _require_loopback(request: Request) -> None:
-    host = request.client.host if request.client else ""
-    if host not in {"127.0.0.1", "::1", "testclient"}:
-        raise HTTPException(status_code=403, detail="loopback access required")
-
-
 def build_admin_router(*, store: ValidationStateStore) -> APIRouter:
     router = APIRouter(prefix="/validation/admin", include_in_schema=False)
 
@@ -25,7 +21,7 @@ def build_admin_router(*, store: ValidationStateStore) -> APIRouter:
     async def seed_permission(
         payload: SeedPermissionRequest, request: Request
     ) -> dict[str, object]:
-        _require_loopback(request)
+        require_loopback(request)
         pending = await store.seed_permission(
             session_id=payload.session_id,
             question=payload.question,
