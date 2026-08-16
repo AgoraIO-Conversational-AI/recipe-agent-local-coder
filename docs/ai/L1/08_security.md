@@ -85,6 +85,15 @@ If you need real auth, add a FastAPI dependency that validates a header on each 
 
 - `/local/workspace`, `/local/workspace/browse`, and `/local/runtime` call
   `require_loopback`; they are not public deployment endpoints.
+- `require_loopback` checks the socket peer, the `Origin` header, and the `Host`
+  header. The socket-peer check blocks other machines, but a local browser is a
+  loopback peer, so a malicious web page could otherwise drive these routes as a
+  confused deputy. A cross-site caller is rejected by its forbidden `Origin`
+  (which page JavaScript cannot forge); the `Host` check closes the
+  DNS-rebinding gap for requests that carry no `Origin`. Non-browser callers
+  (curl, native, and the Next server-side rewrite) send no `Origin` and pass.
+  This does not defend against a malicious local process, which reaches the
+  loopback port without a browser.
 - Next registers `/api/local/*` only with an explicit local-development opt-in,
   a loopback backend URL, and a non-production process. `AGENT_BACKEND_URL`
   alone never exposes these routes.
@@ -110,7 +119,8 @@ If you need real auth, add a FastAPI dependency that validates a header on each 
 - ngrok maps only the dedicated public ASGI listener, never the lifecycle FastAPI port.
 - MCP requests require a per-session, 256-bit runner-issued capability held only in memory.
 - Model-provided tool arguments cannot select a session.
-- Loopback seed controls verify the socket peer and do not trust forwarding headers.
+- Loopback seed controls verify the socket peer, reject cross-site `Origin`/`Host`
+  callers, and do not trust forwarding headers.
 - Validation evidence is gitignored because it can contain transcripts; recursive credential redaction is added with the evidence recorder.
 - The harness has no runtime provider selector or public LLM callback route.
 

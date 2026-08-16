@@ -112,6 +112,43 @@ def test_workspace_routes_are_loopback_only(tmp_path):
         assert remote.delete("/local/workspace").status_code == 403
 
 
+def test_cross_site_browser_origin_is_rejected(tmp_path):
+    """A malicious web page cannot drive loopback routes through the browser."""
+    app, _picker, _runtime, _fake_acp = make_app(tmp_path)
+
+    with TestClient(app) as client:
+        # The socket peer is loopback (the browser runs on the same machine), but
+        # the forbidden Origin header exposes the cross-site caller.
+        blocked = client.post(
+            "/local/workspace/browse",
+            headers={"origin": "https://evil.example.com"},
+        )
+        rebinding = client.get(
+            "/local/workspace", headers={"host": "evil.example.com:8000"}
+        )
+
+    assert blocked.status_code == 403
+    assert rebinding.status_code == 403
+
+
+def test_same_origin_and_headerless_callers_are_allowed(tmp_path):
+    """The dev frontend (loopback Origin) and non-browser callers still pass."""
+    app, _picker, _runtime, _fake_acp = make_app(tmp_path)
+
+    with TestClient(app) as client:
+        no_origin = client.get("/local/workspace")
+        loopback_origin = client.get(
+            "/local/workspace", headers={"origin": "http://127.0.0.1:3000"}
+        )
+        localhost_origin = client.get(
+            "/local/workspace", headers={"origin": "http://localhost:3000"}
+        )
+
+    assert no_origin.status_code == 200
+    assert loopback_origin.status_code == 200
+    assert localhost_origin.status_code == 200
+
+
 def test_browse_persists_only_picker_result(tmp_path):
     project = tmp_path / "project"
     project.mkdir()
