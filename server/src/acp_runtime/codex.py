@@ -199,7 +199,11 @@ class CodexAcpClient:
             return
         try:
             if connection is not None and session_id is not None:
-                await connection.close_session(session_id)
+                try:
+                    await connection.close_session(session_id)
+                except ConnectionError:
+                    # The child may close its transport before accepting session/close.
+                    pass
         finally:
             await process_context.__aexit__(None, None, None)
 

@@ -1,6 +1,7 @@
 """ACP process/session lifecycle tests through the runtime's public boundary."""
 
 import json
+from types import SimpleNamespace
 
 import acp
 import pytest
@@ -97,6 +98,44 @@ async def test_client_initializes_and_creates_session_in_project_folder(
 
     assert fake_agent.requests[-1] == "process/exited"
     assert fake_agent.process_exited
+
+
+@pytest.mark.anyio
+async def test_close_treats_an_already_closed_transport_as_success(
+    monkeypatch, project
+):
+    class ClosedTransportConnection:
+        async def initialize(self, **_kwargs):
+            return SimpleNamespace(auth_methods=[])
+
+        async def new_session(self, **_kwargs):
+            return SimpleNamespace(session_id="closed-session")
+
+        async def close_session(self, _session_id):
+            raise ConnectionError("Connection closed")
+
+    class ProcessContext:
+        def __init__(self):
+            self.exited = False
+
+        async def __aenter__(self):
+            return ClosedTransportConnection(), object()
+
+        async def __aexit__(self, *_args):
+            self.exited = True
+
+    process = ProcessContext()
+    monkeypatch.setattr(
+        "acp_runtime.codex.acp.spawn_agent_process",
+        lambda *_args, **_kwargs: process,
+    )
+    client = CodexAcpClient(command=("fake-acp",))
+    await client.open(str(project))
+
+    await client.close()
+    await client.close()
+
+    assert process.exited
 
 
 @pytest.mark.anyio
