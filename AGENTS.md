@@ -1,13 +1,16 @@
 # Agent Development Guide
 
-This guide is for coding agents making changes in `agent-quickstart-python`.
+This guide is for coding agents making changes in `recipe-agent-acp-local`.
+This repository is the **acp-local** derivative recipe in the Agora
+Conversational AI recipes family, derived from the `base` quickstart
+`agent-quickstart-python` (see [UPSTREAM.md](UPSTREAM.md)).
 
 ## How to Load
 
 This repository uses progressive disclosure documentation. Docs live under `docs/ai/` in three levels.
 
 1. Read [docs/ai/L0_repo_card.md](docs/ai/L0_repo_card.md) to identify the repo.
-2. This repo declares `Recipe Role: base`; read [docs/ai/RECIPE.md](docs/ai/RECIPE.md) before changing reusable quickstart contracts.
+2. This repo declares `Recipe Role: acp-local`; read [docs/ai/RECIPE.md](docs/ai/RECIPE.md) before changing reusable quickstart contracts inherited from the `base` recipe.
 3. Load ALL 8 files in [docs/ai/L1/](docs/ai/L1/). They are small — load all upfront.
 4. Follow L2 deep-dive links only when L1 isn't detailed enough. The index is at [docs/ai/L1/L2/_index.md](docs/ai/L1/L2/_index.md).
 

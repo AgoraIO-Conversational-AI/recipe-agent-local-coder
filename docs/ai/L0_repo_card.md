@@ -1,4 +1,4 @@
-# agora-conversational-ai-demo (python) — Repo Card
+# recipe-agent-acp-local (python) — Repo Card
 
 > Next.js web client + Python FastAPI backend for an Agora Conversational AI voice agent, with an optional isolated Managed Voice LLM evidence surface.
 
@@ -6,14 +6,15 @@
 
 | Field         | Value                                                                |
 | ------------- | -------------------------------------------------------------------- |
-| Repo          | `AgoraIO-Conversational-AI/agent-quickstart-python`                  |
+| Repo          | `AgoraIO-Conversational-AI/recipe-agent-acp-local`                   |
 | Type          | `distributed-system` (single repo, two co-located processes)         |
 | Language      | Python 3.10+ (FastAPI + uvicorn) backend + Next.js 16 / React 19 web  |
 | Deploy Target | `web/` as Next.js app, `server/` as a reachable FastAPI service      |
 | Owner         | Agora Conversational AI DevEx                                        |
 | Last Reviewed | 2026-08-16                                                           |
-| Recipe Role   | `base`                                                               |
-| Recipe Version | `1.1.0`                                                             |
+| Recipe Role   | `acp-local`                                                          |
+| Base Recipe   | `agent-quickstart-python` @ `1.0.0`                                  |
+| Recipe Version | `0.1.0`                                                             |
 | Recipe Status | `experimental`                                                       |
 
 ## L1 — Summaries

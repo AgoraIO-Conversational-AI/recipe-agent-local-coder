@@ -1,5 +1,8 @@
 ---
-recipe_version: 1.1.0
+recipe_role: acp-local
+base_recipe: agent-quickstart-python
+base_recipe_version: 1.0.0
+recipe_version: 0.1.0
 recipe_status: experimental
 extension_points:
   - id: api.routes
@@ -31,13 +34,17 @@ derivative_extensions:
 
 # Recipe Contract
 
-This base recipe defines the reusable surface for a Python-backed Agora Conversational AI quickstart with a Next.js web client.
+This document restates the reusable `base` quickstart surface this recipe
+inherits from `agent-quickstart-python`, and adds the `acp-local` derivative
+extension. The base contract below tracks the upstream `base` recipe (currently
+`1.0.0`); the derivative surface is versioned independently under this recipe's
+own `recipe_version`.
 
 ## Recipe Role
 
-- Role: `base` quickstart recipe.
-- Target audience: developers bootstrapping a production-style Conversational AI app with a Python FastAPI backend and Next.js web client.
-- Reuse model: clone, bind project, run, then customize backend agent behavior or browser UI.
+- Role: `acp-local` derivative recipe, inheriting the `base` quickstart contract.
+- Target audience: developers extending the Python-backed Agora quickstart with a loopback-only local Codex ACP runtime.
+- Reuse model: clone, bind project, run, then customize backend agent behavior or browser UI; the local ACP runtime is an opt-in derivative surface.
 
 ## Recipe Scope
 
@@ -51,7 +58,7 @@ This base recipe provides a copyable split-process starter with:
 
 ## Baseline Implementation Guidance
 
-This repository is the Python-backed Agora quickstart baseline for this recipe. Agents should use this repo's source and progressive disclosure docs as the starting point, then customize.
+This repository derives from the Python-backed Agora quickstart baseline (`agent-quickstart-python`). Agents should use this repo's source and progressive disclosure docs as the starting point, then customize.
 
 Do not recreate Agora ConvoAI integration from memory. Provider schemas, SDK builder fields, token behavior, and RTM event details can drift. For a new baseline implementation, follow [L1/L2/from_scratch_bootstrap.md](L1/L2/from_scratch_bootstrap.md) while copying verified patterns from this repo.
 
