@@ -15,3 +15,19 @@ A possible future alternative in which the Recipe owns an OpenAI-compatible mode
 ## Architecture Evidence
 
 Versioned offline tests and explicitly authorized live observations used to support an architecture decision. Evidence must distinguish verified behavior from unrun comparisons and must record live-usage cost constraints.
+
+## Agent Profile
+
+A backend-neutral declaration of an ACP Agent's configuration needs and supported Workspace capabilities. The v0.1 Codex profile requires one primary directory and supports no additional directories.
+
+## Workspace Scope
+
+The session context bound to Work and an ACP session. It contains a stable local identifier and one resolved primary directory without implying filesystem isolation.
+
+## Project Folder
+
+The user-facing name for the Workspace Scope's primary directory: where the Agent works and resolves relative paths. It is not the only folder the Agent can access and is not a Recipe-owned sandbox.
+
+## Configuration Gate
+
+The blocking pre-ready state shown when the active Agent Profile requires a Project Folder and no valid selection exists. Settings remains available after the gate is cleared so the selection can be changed safely.
