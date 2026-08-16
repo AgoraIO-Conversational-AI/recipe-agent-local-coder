@@ -71,6 +71,33 @@ def test_select_rejects_missing_path_and_regular_file(tmp_path):
     assert service.status().state == "unconfigured"
 
 
+def test_select_rejects_relative_project_folder(tmp_path, monkeypatch):
+    project = tmp_path / "project"
+    project.mkdir()
+    monkeypatch.chdir(tmp_path)
+    service = WorkspaceService(WorkspaceConfigStore(tmp_path / "workspace.json"))
+
+    with pytest.raises(ValueError, match="absolute existing directory"):
+        service.select("project")
+
+    assert service.status().state == "unconfigured"
+
+
+def test_restore_reinstates_a_previous_workspace_without_route_store_access(tmp_path):
+    previous_project = tmp_path / "previous"
+    replacement_project = tmp_path / "replacement"
+    previous_project.mkdir()
+    replacement_project.mkdir()
+    service = WorkspaceService(WorkspaceConfigStore(tmp_path / "workspace.json"))
+    previous = service.select(str(previous_project))
+    service.select(str(replacement_project))
+
+    restored = service.restore(previous)
+
+    assert restored == previous
+    assert service.status() == previous
+
+
 def test_clear_removes_only_saved_workspace_selection(tmp_path):
     project = tmp_path / "project"
     project.mkdir()

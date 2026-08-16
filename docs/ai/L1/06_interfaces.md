@@ -30,13 +30,15 @@ CORS middleware: `allow_origins=["*"]`, `allow_credentials=True`.
 | `/api/stopAgent`   | `${AGENT_BACKEND_URL}/stopAgent`              |
 
 The local Codex derivative appends these loopback-only extension rewrites. They
-do not alter the stable quickstart routes above:
+do not alter the stable quickstart routes above. They register only when
+`VOICE_ACP_LOCAL_RUNTIME=1`, the backend URL is loopback, and Next is not in
+production mode:
 
 | Source | Destination | Method(s) |
 | --- | --- | --- |
 | `/api/local/workspace` | `${AGENT_BACKEND_URL}/local/workspace` | GET, PUT, DELETE |
 | `/api/local/workspace/browse` | `${AGENT_BACKEND_URL}/local/workspace/browse` | POST |
-| `/api/local/runtime` | `${AGENT_BACKEND_URL}/local/runtime` | GET |
+| `/api/local/runtime` | `${AGENT_BACKEND_URL}/local/runtime` | GET, POST |
 
 `verify-api-contracts.ts` asserts that no `web/app/api/**/route.ts` files exist. Adding one would create a competing handler in front of the rewrite — don't.
 
@@ -45,9 +47,12 @@ do not alter the stable quickstart routes above:
 | Scope                  | Variable                                  |
 | ---------------------- | ----------------------------------------- |
 | Python server (required) | `AGORA_APP_ID`, `AGORA_APP_CERTIFICATE` |
-| Python server (optional) | `AGENT_GREETING`, `PORT`                 |
+| Python server (optional) | `AGENT_GREETING`, `HOST`, `PORT`         |
 | Next build             | `AGENT_BACKEND_URL`                       |
 | Browser                | `NEXT_PUBLIC_AGENT_UID` (optional)        |
+| Local launcher/internal | `VOICE_ACP_LOCAL_RUNTIME`, `NEXT_PUBLIC_LOCAL_RUNTIME_ENABLED`, `VOICE_ACP_WORKSPACE` |
+| ACP child advanced     | `CODEX_PATH`, `CODEX_API_KEY`, `OPENAI_API_KEY` |
+| Compatible ACP command | `VOICE_ACP_COMMAND_JSON` (JSON argv array) |
 
 `AGENT_BACKEND_URL` is a Next **server**-time env var (used inside `next.config.ts`), not a `NEXT_PUBLIC_*` value — do not prefix it.
 
@@ -60,7 +65,7 @@ Successful `/local/*` responses use
 | Status | Local-runtime condition | Error body |
 | --- | --- | --- |
 | `403` | Caller is not loopback | `{ "detail": "..." }` |
-| `400` | `PUT` path is not an existing directory | `{ "detail": "Project Folder must be an existing directory" }` |
+| `400` | `PUT` path is not an absolute existing directory | `{ "detail": "Project Folder must be an absolute existing directory" }` |
 | `409` | Picker cancellation or a Workspace switch guard conflict | `{ "detail": "..." }` |
 | `503` | Candidate folder could not activate the local ACP runtime | `{ "detail": "..." }` |
 
@@ -71,14 +76,18 @@ shape. Clients must not expect a success envelope on non-2xx responses.
 Codex `profile`, and an optional workspace `{ id, label, primary_directory }`.
 The profile requires one primary directory and supports no additional directories.
 `PUT` accepts `{ "path": "..." }`; the path must resolve to an existing
-directory. `LocalRuntimeStatus` uses
+absolute directory. `GET /local/runtime` is read-only; `POST /local/runtime`
+explicitly activates a valid saved Workspace. `LocalRuntimeStatus` uses
 `configuration_required`, `starting`, `authentication_required`, `ready`, or
 `failed`, plus `workspace` and an optional safe `error`.
 
 The default ACP command is pinned to `npx -y @agentclientprotocol/codex-acp@1.1.7`
-with `INITIAL_AGENT_MODE=agent`. If the ACP server advertises `ChatGPT`, the
-client authenticates with that method before `new_session(cwd=<resolved folder>,
-mcp_servers=[])`. No API-key mode or `CODEX_PATH` environment override exists.
+with `INITIAL_AGENT_MODE=agent`. It tries `new_session` with reusable credentials
+first. Only typed authentication-required triggers the advertised `ChatGPT`
+method and one retry. `CODEX_PATH`, `CODEX_API_KEY`, and `OPENAI_API_KEY` are
+advanced child pass-through values; custom ACP is a JSON argv array. Secret
+values and child environments are not logged, and full access is never selected
+automatically.
 
 ## Token Shape
 

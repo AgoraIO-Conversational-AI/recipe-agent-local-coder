@@ -123,10 +123,12 @@ class LocalRuntimeCoordinator:
 
 
 def _runtime_failure(exc: Exception) -> tuple[RuntimeState, str]:
-    detail = str(exc).strip() or type(exc).__name__
     if isinstance(exc, AcpAuthenticationRequired):
         return (
             "authentication_required",
             "Sign in to ChatGPT, then retry the local Codex runtime.",
         )
-    return "failed", f"Could not start the local Codex runtime: {detail}"
+    return (
+        "failed",
+        "Could not start the local Codex runtime. Check the local runtime setup and retry.",
+    )

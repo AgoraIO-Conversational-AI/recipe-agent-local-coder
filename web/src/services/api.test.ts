@@ -2,11 +2,13 @@ import { afterEach, expect, test } from 'bun:test'
 
 import {
   browseWorkspace,
+  clearWorkspace,
   getConfig,
   getLocalRuntime,
   getWorkspace,
   selectWorkspace,
   startAgent,
+  startLocalRuntime,
   stopAgent,
 } from './api'
 
@@ -166,4 +168,41 @@ test('selectWorkspace sends the advanced manual path', async () => {
 
   expect(lastCall.init?.method).toBe('PUT')
   expect(JSON.parse(String(lastCall.init?.body))).toEqual({ path: '/tmp/project' })
+})
+
+test('clearWorkspace deletes only the saved local Workspace selection', async () => {
+  mockFetch(200, {
+    code: 0,
+    msg: 'success',
+    data: { state: 'unconfigured', profile: { id: 'codex' }, workspace: null },
+  })
+
+  await clearWorkspace()
+
+  expect(lastCall.url).toContain('/api/local/workspace')
+  expect(lastCall.init?.method).toBe('DELETE')
+})
+
+test('startLocalRuntime explicitly posts to the readiness route', async () => {
+  mockFetch(200, {
+    code: 0,
+    msg: 'success',
+    data: {
+      state: 'ready',
+      workspace: { state: 'ready', profile: { id: 'codex' }, workspace: { id: 'workspace-a' } },
+      error: null,
+    },
+  })
+
+  const status = await startLocalRuntime()
+
+  expect(status.state).toBe('ready')
+  expect(lastCall.url).toContain('/api/local/runtime')
+  expect(lastCall.init?.method).toBe('POST')
+})
+
+test('local Workspace helpers preserve bounded backend validation errors', async () => {
+  mockFetch(400, { detail: 'Project Folder must be an absolute existing directory' })
+
+  await expect(selectWorkspace('relative')).rejects.toThrow('Project Folder must be an absolute existing directory')
 })

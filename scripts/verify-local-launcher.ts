@@ -1,6 +1,6 @@
 import { existsSync, mkdtempSync, readFileSync, rmSync } from 'node:fs'
-import path from 'node:path'
 import { tmpdir } from 'node:os'
+import path from 'node:path'
 
 function assert(condition: unknown, message: string): asserts condition {
   if (!condition) throw new Error(message)
@@ -49,9 +49,9 @@ function childCommand(pidPath: string, body: string): string {
   return `sh -c 'echo $$ > "${pidPath}"; ${body}'`
 }
 
-function startLauncher(backend: string, frontend: string) {
+function startLauncher(backend: string, frontend: string, args: string[] = []) {
   return Bun.spawn({
-    cmd: ['bash', 'scripts/run-local-codex.sh'],
+    cmd: ['bash', 'scripts/run-local-codex.sh', ...args],
     cwd: process.cwd(),
     env: {
       ...process.env,
@@ -62,6 +62,16 @@ function startLauncher(backend: string, frontend: string) {
     stderr: 'ignore',
   })
 }
+
+const overrideProcess = startLauncher(
+  `sh -c 'test "$VOICE_ACP_WORKSPACE" = "/tmp/voice acp workspace" && test "$VOICE_ACP_COMMAND_JSON" = "[\\"custom-acp\\",\\"--stdio\\"]"'`,
+  'sh -c \'trap "exit 0" INT TERM; while :; do sleep 1; done\'',
+  ['--workspace', '/tmp/voice acp workspace', '--acp-command-json', '["custom-acp","--stdio"]'],
+)
+assert((await overrideProcess.exited) === 0, 'advanced launcher overrides should reach children as opaque env values')
+
+const invalidArgumentProcess = startLauncher('exit 0', 'exit 0', ['--unknown-option'])
+assert((await invalidArgumentProcess.exited) !== 0, 'unknown launcher arguments should fail closed')
 
 const failedChildDirectory = mkdtempSync(path.join(tmpdir(), 'voice-acp-launcher-failure-'))
 try {

@@ -1,9 +1,10 @@
 """Codex-specific ACP process and session lifecycle."""
 
+import json
+import os
 import sys
 from contextlib import AbstractAsyncContextManager
 from dataclasses import dataclass
-from pathlib import Path
 from typing import Any, Mapping, Sequence
 
 import acp
@@ -15,11 +16,15 @@ from .acp_client import (
     AcpSession,
     AcpSessionEvent,
 )
+from .workspace import resolve_project_folder
 
 
 _MAX_PERMISSION_OPERATION_BYTES = 160
 _MAX_PERMISSION_OPTION_BYTES = 96
 _MAX_PERMISSION_OPTIONS = 8
+_CUSTOM_COMMAND_ERROR = (
+    "VOICE_ACP_COMMAND_JSON must be a JSON array of non-empty argument strings"
+)
 
 
 @dataclass(frozen=True)
@@ -35,6 +40,40 @@ class CodexCommand:
             argv=("npx", "-y", "@agentclientprotocol/codex-acp@1.1.7"),
             env={"INITIAL_AGENT_MODE": "agent"},
         )
+
+    @classmethod
+    def from_environment(
+        cls, environ: Mapping[str, str] | None = None
+    ) -> "CodexCommand":
+        """Build the advanced launch contract without shell parsing or full access."""
+        values = os.environ if environ is None else environ
+        command = cls.default()
+        raw_override = values.get("VOICE_ACP_COMMAND_JSON")
+        if raw_override:
+            try:
+                parsed = json.loads(raw_override)
+            except (TypeError, json.JSONDecodeError) as exc:
+                raise ValueError(_CUSTOM_COMMAND_ERROR) from exc
+            if (
+                not isinstance(parsed, list)
+                or not parsed
+                or len(parsed) > 64
+                or any(
+                    not isinstance(argument, str)
+                    or not argument.strip()
+                    or len(argument.encode("utf-8")) > 4096
+                    for argument in parsed
+                )
+            ):
+                raise ValueError(_CUSTOM_COMMAND_ERROR)
+            command = cls(argv=tuple(parsed), env=command.env)
+
+        child_env = {"INITIAL_AGENT_MODE": "agent"}
+        for name in ("CODEX_PATH", "CODEX_API_KEY", "OPENAI_API_KEY"):
+            value = values.get(name)
+            if value:
+                child_env[name] = value
+        return cls(argv=command.argv, env=child_env)
 
 
 class _AcpCallback:
@@ -74,7 +113,7 @@ class CodexAcpClient:
     """Own one local Codex ACP child process and one session at a time."""
 
     def __init__(self, command: CodexCommand | Sequence[str] | None = None) -> None:
-        resolved_command = command or CodexCommand.default()
+        resolved_command = command or CodexCommand.from_environment()
         if isinstance(resolved_command, CodexCommand):
             self._argv = resolved_command.argv
             self._env = dict(resolved_command.env)
@@ -104,7 +143,7 @@ class CodexAcpClient:
         """Start ACP v1 and create one session scoped to an existing absolute folder."""
         if self._session is not None:
             raise RuntimeError("An ACP session is already open")
-        resolved_path = _resolve_project_folder(primary_directory)
+        resolved_path = resolve_project_folder(primary_directory)
         process_context = acp.spawn_agent_process(
             self._callback,
             self._argv[0],
@@ -117,15 +156,24 @@ class CodexAcpClient:
             connection, _process = await process_context.__aenter__()
             initialized = await connection.initialize(protocol_version=acp.PROTOCOL_VERSION)
             chatgpt_method = _advertised_chatgpt_method(initialized.auth_methods)
-            if chatgpt_method is not None:
+            try:
+                new_session = await connection.new_session(
+                    cwd=resolved_path,
+                    mcp_servers=[],
+                )
+            except acp.RequestError as exc:
+                if exc.code != -32000:
+                    raise
+                if chatgpt_method is None:
+                    raise AcpAuthenticationRequired() from exc
                 try:
                     await connection.authenticate(chatgpt_method)
-                except Exception as exc:
-                    raise AcpAuthenticationRequired() from exc
-            new_session = await connection.new_session(
-                cwd=resolved_path,
-                mcp_servers=[],
-            )
+                except Exception as auth_exc:
+                    raise AcpAuthenticationRequired() from auth_exc
+                new_session = await connection.new_session(
+                    cwd=resolved_path,
+                    mcp_servers=[],
+                )
         except BaseException:
             if connection is not None:
                 await process_context.__aexit__(*sys.exc_info())
@@ -154,19 +202,6 @@ class CodexAcpClient:
                 await connection.close_session(session_id)
         finally:
             await process_context.__aexit__(None, None, None)
-
-
-def _resolve_project_folder(primary_directory: str) -> str:
-    path = Path(primary_directory)
-    if not path.is_absolute():
-        raise ValueError("Project Folder must be an absolute existing directory")
-    try:
-        resolved = path.resolve(strict=True)
-    except (OSError, RuntimeError) as exc:
-        raise ValueError("Project Folder must be an absolute existing directory") from exc
-    if not resolved.is_dir():
-        raise ValueError("Project Folder must be an absolute existing directory")
-    return str(resolved)
 
 
 def _advertised_chatgpt_method(auth_methods: object) -> str | None:

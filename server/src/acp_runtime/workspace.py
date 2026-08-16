@@ -20,6 +20,21 @@ class AgentProfile:
 
 
 CODEX_PROFILE = AgentProfile()
+_PROJECT_FOLDER_ERROR = "Project Folder must be an absolute existing directory"
+
+
+def resolve_project_folder(path: str) -> str:
+    """Return one resolved absolute directory for Workspace and ACP boundaries."""
+    candidate = Path(path).expanduser()
+    if not candidate.is_absolute():
+        raise ValueError(_PROJECT_FOLDER_ERROR)
+    try:
+        resolved = candidate.resolve(strict=True)
+    except (OSError, RuntimeError) as exc:
+        raise ValueError(_PROJECT_FOLDER_ERROR) from exc
+    if not resolved.is_dir():
+        raise ValueError(_PROJECT_FOLDER_ERROR)
+    return str(resolved)
 
 
 @dataclass(frozen=True)
@@ -121,17 +136,12 @@ class WorkspaceService:
         )
 
     def select(self, path: str) -> WorkspaceStatus:
-        try:
-            resolved = Path(path).expanduser().resolve(strict=True)
-        except (OSError, RuntimeError) as exc:
-            raise ValueError("Project Folder must be an existing directory") from exc
-        if not resolved.is_dir():
-            raise ValueError("Project Folder must be an existing directory")
+        resolved = resolve_project_folder(path)
 
         workspace = WorkspaceScope(
             id=hashlib.sha256(os.fsencode(resolved)).hexdigest()[:24],
-            label=resolved.name or str(resolved),
-            primary_directory=str(resolved),
+            label=Path(resolved).name or resolved,
+            primary_directory=resolved,
         )
         self.store.save(workspace)
         return WorkspaceStatus(
@@ -139,6 +149,14 @@ class WorkspaceService:
             profile=CODEX_PROFILE,
             workspace=workspace,
         )
+
+    def restore(self, previous: WorkspaceStatus) -> WorkspaceStatus:
+        """Restore one status snapshot after a replacement activation fails."""
+        if previous.workspace is None:
+            self.store.clear()
+        else:
+            self.store.save(previous.workspace)
+        return self.status()
 
     def clear(self) -> WorkspaceStatus:
         self.store.clear()

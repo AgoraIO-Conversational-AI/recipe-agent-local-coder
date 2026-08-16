@@ -26,11 +26,23 @@ routes, and safe failure states. They do not prove a real `npx` download or
 Codex launch, ChatGPT browser authentication, macOS picker behavior, Agora
 conversation start, or ngrok. Treat each as an authorized manual/live check.
 
-## No `CODEX_PATH` Environment Override
+## Local Runtime Overrides Are Explicit and Narrow
 
-The v0.1 default is the pinned `npx` argv. Backend callers may inject
-`CodexCommand` or an argv sequence in code; no environment parser maps
-`CODEX_PATH` to the command. Do not document it as supported.
+The default remains the pinned `npx` argv with `INITIAL_AGENT_MODE=agent`.
+`CODEX_PATH`, `CODEX_API_KEY`, and `OPENAI_API_KEY` pass only to the child.
+Custom ACP commands use `VOICE_ACP_COMMAND_JSON` as a JSON argv array, never a
+shell string. Do not log any child environment or auto-select full access.
+
+`--workspace` is converted to `VOICE_ACP_WORKSPACE` by the launcher, then uses
+the same absolute, existing-directory validation and persistence path as
+Settings. Ordinary FastAPI startup does not activate ACP; the local page uses
+the explicit runtime POST after loading saved state.
+
+## Local Rewrites Are Not Deployment Routes
+
+`AGENT_BACKEND_URL` alone registers only the three stable quickstart rewrites.
+`/api/local/*` additionally requires the local opt-in, a loopback backend URL,
+and a non-production Next process. Do not set the opt-in on a public deployment.
 
 ## No `web/app/api/**/route.ts`
 

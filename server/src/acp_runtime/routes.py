@@ -107,6 +107,15 @@ def build_runtime_router(*, runtime: LocalRuntimeCoordinator) -> APIRouter:
             "data": asdict(runtime.status()),
         }
 
+    @router.post("")
+    async def start_runtime(request: Request) -> dict[str, object]:
+        require_loopback(request)
+        return {
+            "code": 0,
+            "msg": "success",
+            "data": asdict(await runtime.start()),
+        }
+
     return router
 
 
@@ -132,16 +141,8 @@ async def _select_and_activate(
     if readiness.state == "ready":
         return _envelope(selected)
 
-    _restore_workspace(service, previous)
+    service.restore(previous)
     raise HTTPException(
         status_code=503,
         detail=readiness.error or "The local Codex runtime is not ready.",
     )
-
-
-def _restore_workspace(service: WorkspaceService, previous: WorkspaceStatus) -> None:
-    """Undo a persisted switch when its replacement ACP session cannot open."""
-    if previous.workspace is None:
-        service.clear()
-        return
-    service.store.save(previous.workspace)

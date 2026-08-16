@@ -35,7 +35,9 @@ bun run dev:codex
 It binds FastAPI to `127.0.0.1:8000`, serves the web app on `127.0.0.1:3000`,
 and lets FastAPI own the Project Folder picker and ACP child process. It does
 not start an Agora conversation until the browser user chooses **Start
-conversation**, and it does not run ngrok.
+conversation**, and it does not run ngrok. Preflight requires macOS Apple
+Silicon, Bun/Node/Python, and usable Agora configuration without printing
+credential values.
 
 This assumes the Agora CLI is installed and logged in. The command uses the project selected in your Agora CLI context, which is usually your default account project.
 
@@ -64,6 +66,8 @@ cp .env.example .env.local
 `.env.example` is the reference template. If you are not using the Agora CLI, edit `.env.local` and fill in your Agora credentials:
 - `AGORA_APP_ID` - Your Agora App ID (Required)
 - `AGORA_APP_CERTIFICATE` - Your Agora App Certificate (Required)
+- `HOST` - Optional bind host (`0.0.0.0` by default; local Codex fixes loopback)
+- `PORT` - Optional bind port (`8000` by default)
 - Agora managed provider access should be enabled for this project
 
 If you still need to authenticate with the CLI:
@@ -161,23 +165,29 @@ The selected directory is ACP context for session creation and relative paths,
 not a filesystem sandbox.
 
 The loopback-only routes below are consumed through Next `/api/local/*`
-rewrites. They are derivative extensions and do not change the stable
+rewrites only during the explicit non-production local mode with a loopback
+backend. They are derivative extensions and do not change the stable
 `/get_config`, `/startAgent`, or `/stopAgent` quickstart routes:
 
 - `GET`, `PUT`, `DELETE /local/workspace`
 - `POST /local/workspace/browse` (macOS native picker)
-- `GET /local/runtime`
+- `GET /local/runtime` (readiness only; never starts ACP)
+- `POST /local/runtime` (explicitly activate a valid saved Workspace)
 
-`LocalRuntimeCoordinator` starts ACP only for a ready workspace and keeps one
-session at a time. A folder replacement closes the old session before opening
-the new one; if the new session fails, the previous saved workspace record is
-restored. The default `CodexAcpClient` starts the pinned on-demand command
+Ordinary FastAPI startup never starts ACP. `LocalRuntimeCoordinator` starts it
+only through the explicit local-runtime flow for a ready workspace and keeps
+one session at a time. A folder replacement closes the old session before
+opening the new one; if the new session fails, the previous saved workspace
+record is restored. The default `CodexAcpClient` starts the pinned on-demand command
 `npx -y @agentclientprotocol/codex-acp@1.1.7`, uses `INITIAL_AGENT_MODE=agent`,
-and opens one ACP session with `mcp_servers=[]`. When advertised, ChatGPT is the
-only configured auth method; API-key auth is not configured.
+and opens one ACP session with `mcp_servers=[]`. Session creation is attempted
+with reusable credentials first. A typed authentication-required response uses
+the advertised ChatGPT method and retries once.
 
-Advanced backend integrations may inject `CodexCommand` or an argv sequence
-into `CodexAcpClient`. There is no `CODEX_PATH` environment override in v0.1.
+Advanced launch paths support `--workspace`, `CODEX_PATH`, `CODEX_API_KEY`,
+`OPENAI_API_KEY`, and `--acp-command-json`. The custom command is a JSON argv
+array, never a shell string. Overrides do not select full access, bypass normal
+Workspace validation, or log secret values/child environments.
 Offline tests inject fake ACP clients/processes, so they do not validate a real
 `npx` invocation or browser sign-in.
 

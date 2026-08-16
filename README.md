@@ -63,8 +63,9 @@ Services:
 
 `bun run dev:codex` starts the loopback-only FastAPI backend on
 `127.0.0.1:8000` and the Next.js app on `127.0.0.1:3000`. It performs the
-normal dependency checks first, then supervises both processes so either child
-stopping also stops its sibling.
+normal dependency checks first, verifies macOS Apple Silicon, Bun/Node/Python,
+and usable Agora credentials without printing their values, then supervises
+both processes so either child stopping also stops its sibling.
 
 ```bash
 bun run dev:codex
@@ -75,9 +76,10 @@ Choose an existing folder with the native macOS picker (or use the advanced
 path field). The resolved folder is persisted at
 `~/Library/Application Support/Agora Voice ACP/workspace.json`, unless
 `VOICE_ACP_STATE_DIR` selects a different state directory. A valid saved folder
-allows the backend to start one local ACP session; changing or clearing it
-closes that session first. A failed replacement retains the previous saved
-folder.
+lets the local web flow explicitly activate one ACP session after both services
+start; ordinary FastAPI startup never launches, downloads, or authenticates
+ACP. Changing or clearing the folder closes the active session first. A failed
+replacement retains the previous saved folder.
 
 Project Folder is ACP session context for resolving work and relative paths. It
 is **not** a filesystem sandbox and does not limit what the child process can
@@ -90,11 +92,24 @@ The default child command is pinned and on-demand:
 npx -y @agentclientprotocol/codex-acp@1.1.7
 ```
 
-When ACP advertises the `ChatGPT` authentication method, the local client uses
-that method; no API-key authentication mode is configured by this foundation.
-The current advanced override is backend-only: callers may construct
-`CodexAcpClient(command=CodexCommand(...))` or pass a command argv sequence.
-`CODEX_PATH` is not implemented as an environment override in v0.1.
+The client first tries to create a session with reusable Codex credentials. If
+ACP returns its typed authentication-required response, the client uses the
+advertised `ChatGPT` method and retries session creation once.
+
+Advanced launch options do not bypass Project Folder validation or select full
+access:
+
+```bash
+bun run dev:codex -- --workspace /absolute/path/to/project
+CODEX_PATH=/absolute/path/to/codex bun run dev:codex
+CODEX_API_KEY=... bun run dev:codex
+OPENAI_API_KEY=... bun run dev:codex
+bun run dev:codex -- --acp-command-json '["/absolute/path/to/acp-agent","--stdio"]'
+```
+
+`CODEX_PATH`, `CODEX_API_KEY`, and `OPENAI_API_KEY` are passed only to the ACP
+child. The custom command is parsed only as a JSON argv array and is never run
+through a shell. Secret values and child-command environments are never logged.
 
 ## Deploy
 
@@ -131,8 +146,13 @@ Primary backend env file: [`server/.env.example`](server/.env.example).
 | `AGORA_APP_ID` | ✅ | — | Agora Console -> Project -> App ID |
 | `AGORA_APP_CERTIFICATE` | ✅ | — | Agora Console -> Project -> App Certificate (server only) |
 | `AGENT_GREETING` |  | built-in greeting | Optional opening line override |
+| `HOST` |  | `0.0.0.0` | FastAPI bind host; `dev:codex` fixes this to `127.0.0.1` |
 | `PORT` |  | `8000` | FastAPI server port |
 | `AGENT_BACKEND_URL` (web deploy) | ✅ | — | Required in deployed `web` app when proxying to external FastAPI |
+| `VOICE_ACP_STATE_DIR` |  | macOS Application Support | Local Workspace state parent directory |
+| `CODEX_PATH` |  | packaged Codex | Advanced Codex binary override passed to ACP |
+| `CODEX_API_KEY`, `OPENAI_API_KEY` |  | — | Advanced child-process pass-through; values are never logged |
+| `VOICE_ACP_COMMAND_JSON` |  | pinned ACP command | Advanced JSON argv array; prefer `--acp-command-json` |
 
 Architecture-evidence variables are documented in `server/.env.example`. Per-session MCP capabilities are generated at runtime and are never developer-managed environment variables. `VALIDATION_MODEL` must match the controls in `validation/corpus.json`.
 
@@ -149,6 +169,7 @@ bun run dev:codex
 # Quality
 bun run doctor
 bun run doctor:local
+bun run preflight:codex
 bun run verify:backend
 bun run verify:launcher
 
@@ -176,8 +197,10 @@ runs them on Linux/macOS/Windows × Python 3.10 & 3.13.
 The browser talks to Next.js `/api/*` routes. In local mode, Next rewrites those routes to FastAPI using `AGENT_BACKEND_URL=http://localhost:8000`; FastAPI owns token generation and agent start/stop logic.
 
 The derivative local-runtime extension adds loopback-only Project Folder and
-readiness routes under `/api/local/*`. It does not change the stable quickstart
-routes or make ACP, Codex, or the Project Folder public browser APIs.
+readiness routes under `/api/local/*`. Next registers them only for the
+explicit local-development opt-in with a loopback backend, and never in a
+production build. It does not change the stable quickstart routes or make ACP,
+Codex, or the Project Folder public browser APIs.
 
 ## What You Get
 

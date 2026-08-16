@@ -25,6 +25,8 @@ Agora Cloud Services
 `bun run dev:codex` is a separate local-development entry point. It starts
 FastAPI and Next on loopback interfaces and does not start an Agora agent until
 the user presses **Start conversation**. It also does not start ngrok.
+Its preflight checks the certified macOS Apple Silicon platform, Bun/Node/Python,
+and usable Agora configuration without printing credential values.
 
 ```text
 Browser Settings gate
@@ -47,13 +49,21 @@ valid folder exists, closes an old session before opening a replacement, and
 returns `configuration_required`, `starting`, `authentication_required`,
 `ready`, or `failed` without exposing ACP protocol data.
 
+Ordinary FastAPI lifespan startup never starts ACP, even when a saved Workspace
+exists. The local web flow explicitly activates saved state with
+`POST /api/local/runtime`; `GET /api/local/runtime` remains read-only. Next
+publishes `/api/local/*` rewrites only for an explicit development opt-in, a
+loopback backend URL, and a non-production Next process.
+
 `CodexAcpClient` owns the child-process boundary. Its default command is
 `npx -y @agentclientprotocol/codex-acp@1.1.7` with `INITIAL_AGENT_MODE=agent`;
-it initializes ACP, selects the advertised ChatGPT auth method only when one is
-advertised, and creates one session with the resolved folder and `mcp_servers=[]`.
-No API-key authentication mode is configured. Backend callers can inject a
-`CodexCommand` or argv sequence for advanced use; `CODEX_PATH` is not an
-implemented environment override in v0.1.
+it initializes ACP and first tries session creation with reusable credentials.
+Only a typed authentication-required response triggers the advertised ChatGPT
+method and one session-creation retry. `CODEX_PATH`, `CODEX_API_KEY`, and
+`OPENAI_API_KEY` are advanced child-environment pass-through values. A custom
+Compatible ACP command is accepted only as a JSON argv array. None of these
+paths changes `INITIAL_AGENT_MODE=agent`, selects full access, or logs command
+environments.
 
 ## Shared Conversation Flow
 
@@ -108,7 +118,8 @@ the reusable three-route quickstart contract:
 | `/local/workspace` | PUT | Resolve, persist, and activate an existing Project Folder |
 | `/local/workspace` | DELETE | Close local ACP and clear the saved selection |
 | `/local/workspace/browse` | POST | Open the backend-owned native macOS folder picker |
-| `/local/runtime` | GET | Return safe local ACP readiness state |
+| `/local/runtime` | GET | Return safe local ACP readiness state without starting ACP |
+| `/local/runtime` | POST | Explicitly activate ACP for a valid saved Workspace |
 
 Frontend calls these as `/api/*`. Next rewrites those calls to `AGENT_BACKEND_URL`; the Next app does not run token or AgentKit logic in-process.
 

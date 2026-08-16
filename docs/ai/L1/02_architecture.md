@@ -51,6 +51,11 @@ async rewrites() {
 
 If `AGENT_BACKEND_URL` is unset/empty, **no rewrites register** — the client cannot reach the backend. `bun run dev` always exports `AGENT_BACKEND_URL=http://localhost:8000` before starting Next.
 
+The derivative `/api/local/*` rewrites have a stricter gate: the launcher must
+set `VOICE_ACP_LOCAL_RUNTIME=1`, `AGENT_BACKEND_URL` must name a loopback host,
+and `NODE_ENV` must not be `production`. Normal and public Next deployments do
+not publish the local filesystem/runtime facade.
+
 ## FastAPI Shape
 
 `server/src/server.py`:
@@ -100,9 +105,16 @@ Project Folder Settings gate -> /api/local/* -> /local/* -> WorkspaceService
 `WorkspaceService` persists one resolved primary directory. It is ACP context,
 not a filesystem sandbox. `LocalRuntimeCoordinator` returns only safe
 readiness states and serializes one active session; it closes an old session
-before opening a replacement. `CodexAcpClient` uses the pinned `npx` command,
-performs advertised ChatGPT auth when required, and creates a session with
-`mcp_servers=[]`. Offline tests replace this boundary with fake clients/processes.
+before opening a replacement. Ordinary FastAPI lifespan startup only owns
+cleanup; it never starts ACP. The local page explicitly activates saved state
+through `POST /api/local/runtime`, while the GET is read-only.
+
+`CodexAcpClient` uses the pinned `npx` command, tries session creation with
+reusable credentials first, performs advertised ChatGPT auth only after typed
+authentication-required, and retries once with `mcp_servers=[]`. Advanced
+child pass-through and JSON-argv custom commands remain in agent mode and do
+not expose command environments. Offline tests replace this boundary with fake
+clients/processes.
 
 ## Validation-only public boundary
 

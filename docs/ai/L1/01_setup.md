@@ -38,6 +38,7 @@ bun run setup
 AGORA_APP_ID=your_agora_app_id
 AGORA_APP_CERTIFICATE=your_agora_app_certificate
 AGENT_GREETING=Hi there! I'm Ada, your virtual assistant from Agora. How can I help?
+HOST=0.0.0.0
 PORT=8000
 ```
 
@@ -53,10 +54,15 @@ AGENT_BACKEND_URL=http://localhost:8000
 | `AGORA_APP_ID`           | Python (server)      | Yes      | Loaded by `Agent.__init__` via `os.environ`.                          |
 | `AGORA_APP_CERTIFICATE`  | Python (server)      | Yes      | Server-only.                                                          |
 | `AGENT_GREETING`         | Python (server)      | No       | Optional first utterance.                                             |
+| `HOST`                   | Python (server)      | No       | Default `0.0.0.0`; `dev:codex` fixes loopback.                        |
 | `PORT`                   | Python (server)      | No       | Default `8000` (`server.py`).                                          |
 | `AGENT_BACKEND_URL`      | Next build (web)     | Yes for rewrites | Empty/missing → no `/api/*` rewrites registered. Required by `web/scripts/doctor.ts`. |
 | `NEXT_PUBLIC_AGENT_UID`  | Browser (web)        | No       | Optional UID override read in `ConversationComponent.tsx`.            |
 | `VOICE_ACP_STATE_DIR`    | Python (local Codex) | No       | Overrides the parent directory for persisted `workspace.json`.        |
+| `VOICE_ACP_WORKSPACE`    | Python (local Codex) | No       | Internal value set by the validated `--workspace` launcher option.     |
+| `CODEX_PATH`             | ACP child            | No       | Advanced Codex binary override passed only to the child.               |
+| `CODEX_API_KEY` / `OPENAI_API_KEY` | ACP child | No | Advanced auth pass-through; values are never logged.                   |
+| `VOICE_ACP_COMMAND_JSON` | Python (local Codex) | No       | Advanced JSON argv array; never parsed by a shell.                     |
 
 The optional Managed-path evidence harness additionally uses `VALIDATION_MODEL` and `PUBLIC_VALIDATION_BASE_URL`. It calls `update` and `say` through the authenticated Agent session and needs no separate model-provider credentials. The runner creates MCP capabilities in memory; do not add static capability tokens to `.env.local`.
 
@@ -84,6 +90,7 @@ bun run dev:backend            # python3 server/src/server.py
 bun run dev:frontend           # cd web && AGENT_BACKEND_URL=http://localhost:8000 bun run dev
 bun run doctor                 # bun + node_modules sanity
 bun run doctor:local           # adds python3 + .env.local + AGORA_* presence
+bun run preflight:codex        # certified platform/runtime/Agora config, no secret output
 bun run build                  # bun --filter web build
 bun run verify                 # doctor + verify:web:api + verify:web:build
 bun run verify:local           # doctor:local + verify:backend + verify:local:fastapi + verify:web:proxy + verify:web:build
@@ -123,11 +130,17 @@ under `VOICE_ACP_STATE_DIR` when that variable is set.
 
 The folder supplies ACP session context and relative-path resolution; it is not
 a filesystem sandbox. The default ACP child command is
-`npx -y @agentclientprotocol/codex-acp@1.1.7`. If it advertises ChatGPT
-authentication, complete that local flow and retry. Offline checks cannot
-verify the package download, browser sign-in, native picker, Agora conversation,
-or ngrok. Advanced code can inject `CodexCommand` or argv into `CodexAcpClient`;
-`CODEX_PATH` is not an environment override in v0.1.
+`npx -y @agentclientprotocol/codex-acp@1.1.7`. The client first tries session
+creation with reusable credentials. Typed authentication-required triggers the
+advertised ChatGPT method and one retry. Ordinary backend startup never starts
+ACP; the local browser flow explicitly activates a valid saved Workspace.
+
+Use `bun run dev:codex -- --workspace /absolute/path` for the startup Workspace
+override. `CODEX_PATH`, `CODEX_API_KEY`, and `OPENAI_API_KEY` are advanced child
+pass-through values. `--acp-command-json '["agent","--stdio"]'` supplies a
+Compatible custom command without shell parsing. None selects full access.
+Offline checks cannot verify package download, browser sign-in, native picker,
+Agora conversation, or ngrok.
 
 ## Common Setup Failures
 

@@ -11,6 +11,7 @@
 | Web → rewrite stub       | `web/scripts/verify-local-proxy.ts`          | `bun run verify:web:proxy`| Imports `next.config.ts`, resolves rewrites, fetches an in-process stub directly |
 | Web → FastAPI + FakeAgent| `web/scripts/verify-local-fastapi.ts`        | `bun run verify:local:fastapi` | Spawns FastAPI with `FakeAgent` patched in              |
 | Local launcher           | `scripts/verify-local-launcher.ts`           | `bun run verify:launcher` | Harmless child stubs prove sibling cleanup on failure, SIGINT, and SIGTERM |
+| Local preflight          | `scripts/local-codex-preflight.test.ts`      | `bun test scripts/local-codex-preflight.test.ts` | Certified platform/runtime/config rules without live services |
 
 `bun run verify` is the production-bound chain (`doctor` → `verify:web:api` → `verify:web:build`). `bun run verify:local` is the dev-bound chain (`doctor:local` → `verify:backend` → `verify:local:fastapi` → `verify:web:proxy` → `verify:web:build`).
 
@@ -23,6 +24,8 @@ What it does:
 1. Globs `web/app/api/**/route.ts` and fails if any exist.
 2. Imports `web/next.config.ts` and asserts `rewrites()` returns the expected `source` → `destination` triples.
 3. Imports `web/src/services/api.ts` and asserts each helper hits the correct URL with the correct body shape (via a mock `fetch`).
+4. Proves local rewrites require opt-in and covers GET/PUT/DELETE Workspace,
+   GET/POST runtime, and bounded local validation/error responses.
 
 When you add a route:
 
@@ -75,9 +78,12 @@ tests under `server/tests/architecture_validation/` and
 - Serialized local readiness with fake ACP clients: one active session,
   replacement close-before-open, authentication failure, generic failure, and
   concurrent lifecycle handling.
+- Ordinary app startup with a saved Workspace, explicit runtime activation,
+  safe readiness errors, and advanced override parsing/pass-through.
 - `CodexAcpClient` through a repository-owned fake ACP process that records
-  protocol method names only. It validates initialization, advertised ChatGPT
-  authentication, `new_session`, and process cleanup without starting Codex.
+  protocol method names only. It validates saved-auth session creation,
+  typed authentication-required retry, `new_session`, and process cleanup
+  without starting Codex.
 
 It catches:
 
@@ -102,6 +108,8 @@ What it does:
    `LOCAL_BACKEND_COMMAND` and `LOCAL_FRONTEND_COMMAND`.
 3. Proves a failing child returns failure and terminates its sibling.
 4. Proves SIGINT and SIGTERM terminate both stub child processes.
+5. Proves `--workspace` and JSON-argv custom-command values reach children as
+   opaque environment values, and unknown arguments fail closed.
 
 The injection variables are test seams, not normal end-user command overrides.
 This check does not launch the real `dev:codex` services, Codex, browser auth,

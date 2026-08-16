@@ -8,7 +8,7 @@ type QuickstartPreCallCardProps = {
 	isLoading: boolean;
 	error: string | null;
 	onStartConversation: () => void;
-	onOpenSettings: () => void;
+	onOpenSettings?: () => void;
 };
 
 export function QuickstartPreCallCard({
@@ -25,15 +25,17 @@ export function QuickstartPreCallCard({
 					"linear-gradient(164.988deg, rgba(54,54,54,0.2) 1.0596%, rgba(0,0,0,0) 96.089%), linear-gradient(90deg, rgb(16,16,16) 0%, rgb(16,16,16) 100%)",
 			}}
 		>
-			<button
-				type="button"
-				onClick={onOpenSettings}
-				className="self-end -mr-2 -mt-2 flex h-10 items-center gap-2 rounded-xl px-3 text-xs font-medium text-muted-foreground transition-[color,background-color,transform] duration-150 hover:bg-white/5 hover:text-foreground active:scale-[0.96]"
-				aria-label="Open Project Folder settings"
-			>
-				<Settings2 className="h-4 w-4" aria-hidden="true" />
-				Settings
-			</button>
+			{onOpenSettings ? (
+				<button
+					type="button"
+					onClick={onOpenSettings}
+					className="self-end -mr-2 -mt-2 flex h-10 items-center gap-2 rounded-xl px-3 text-xs font-medium text-muted-foreground transition-[color,background-color,transform] duration-150 hover:bg-white/5 hover:text-foreground active:scale-[0.96]"
+					aria-label="Open Project Folder settings"
+				>
+					<Settings2 className="h-4 w-4" aria-hidden="true" />
+					Settings
+				</button>
+			) : null}
 			<h1 className="text-[28px] font-medium leading-[1.2] text-white">
 				Try Agora&apos;s Voice Agent
 			</h1>

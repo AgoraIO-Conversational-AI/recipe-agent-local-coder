@@ -26,6 +26,7 @@ from pydantic import BaseModel
 from agora_agent.agentkit.token import generate_convo_ai_token
 from agent import Agent
 from acp_runtime.codex import CodexAcpClient
+from acp_runtime.launch import apply_workspace_override
 from acp_runtime.picker import MacOSDirectoryPicker
 from acp_runtime.readiness import LocalRuntimeCoordinator
 from acp_runtime.routes import build_runtime_router, build_workspace_router
@@ -68,13 +69,13 @@ except ValueError as e:
 
 # Local ACP readiness has its own lifecycle and does not start an Agora session.
 workspace_service = WorkspaceService(WorkspaceConfigStore.default())
+apply_workspace_override(workspace_service, os.environ)
 local_runtime = LocalRuntimeCoordinator(workspace_service, CodexAcpClient())
 
 
 @asynccontextmanager
 async def local_runtime_lifespan(_app: FastAPI):
-    """Open ACP at startup only when a valid Project Folder is already selected."""
-    await local_runtime.start()
+    """Keep ordinary server startup side-effect free; clean up if locally activated."""
     try:
         yield
     finally:

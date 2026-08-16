@@ -127,10 +127,15 @@ async function withStubBackend<T>(run: (baseUrl: string) => Promise<T>) {
 }
 
 async function main() {
+  const mutableEnv = process.env as Record<string, string | undefined>
   const originalBackendUrl = process.env.AGENT_BACKEND_URL
+  const originalLocalRuntime = process.env.VOICE_ACP_LOCAL_RUNTIME
+  const originalNodeEnv = process.env.NODE_ENV
 
   await withStubBackend(async (backendUrl) => {
-    process.env.AGENT_BACKEND_URL = backendUrl
+    mutableEnv.AGENT_BACKEND_URL = backendUrl
+    mutableEnv.VOICE_ACP_LOCAL_RUNTIME = '1'
+    mutableEnv.NODE_ENV = 'development'
 
     const configResponse = await requestViaRewrite('/api/get_config?uid=4321&channel=proxy-channel')
     const configBody = await getJson(configResponse)
@@ -173,9 +178,19 @@ async function main() {
   })
 
   if (originalBackendUrl) {
-    process.env.AGENT_BACKEND_URL = originalBackendUrl
+    mutableEnv.AGENT_BACKEND_URL = originalBackendUrl
   } else {
-    process.env.AGENT_BACKEND_URL = ''
+    mutableEnv.AGENT_BACKEND_URL = ''
+  }
+  if (originalLocalRuntime) {
+    mutableEnv.VOICE_ACP_LOCAL_RUNTIME = originalLocalRuntime
+  } else {
+    mutableEnv.VOICE_ACP_LOCAL_RUNTIME = ''
+  }
+  if (originalNodeEnv) {
+    mutableEnv.NODE_ENV = originalNodeEnv
+  } else {
+    mutableEnv.NODE_ENV = ''
   }
 
   console.log('Local proxy checks passed')

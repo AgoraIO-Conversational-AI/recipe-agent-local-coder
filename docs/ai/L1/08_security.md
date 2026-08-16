@@ -15,7 +15,9 @@
 | -------------- | ---------------------------------------------------------------------- |
 | Browser        | `NEXT_PUBLIC_AGENT_UID` (optional)                                     |
 | Next build/run | `AGENT_BACKEND_URL`                                                    |
-| FastAPI        | `AGORA_APP_ID`, `AGORA_APP_CERTIFICATE`, `AGENT_GREETING`, `PORT`      |
+| FastAPI        | `AGORA_APP_ID`, `AGORA_APP_CERTIFICATE`, `AGENT_GREETING`, `HOST`, `PORT` |
+| Local launcher | `VOICE_ACP_LOCAL_RUNTIME`, `VOICE_ACP_WORKSPACE`, `VOICE_ACP_COMMAND_JSON` |
+| ACP child      | trimmed inherited env plus `INITIAL_AGENT_MODE=agent` and explicit `CODEX_PATH` / API-key pass-through |
 
 Mark `AGORA_APP_CERTIFICATE` as a sensitive secret in whichever host runs the Python service. The certificate value never appears in `web/`.
 
@@ -83,6 +85,9 @@ If you need real auth, add a FastAPI dependency that validates a header on each 
 
 - `/local/workspace`, `/local/workspace/browse`, and `/local/runtime` call
   `require_loopback`; they are not public deployment endpoints.
+- Next registers `/api/local/*` only with an explicit local-development opt-in,
+  a loopback backend URL, and a non-production process. `AGENT_BACKEND_URL`
+  alone never exposes these routes.
 - The native macOS picker runs in the backend process, so the browser receives
   only the selected status payload and never direct filesystem-picker access.
 - Project Folder gives ACP a resolved working-directory context. It is not a
@@ -90,10 +95,15 @@ If you need real auth, add a FastAPI dependency that validates a header on each 
 - `CodexAcpClient` does not log ACP JSON-RPC frames, environment values,
   authentication data, raw reasoning, or private protocol identifiers. Callback
   storage retains only safe update-kind summaries and bounded permission prompts.
+- Readiness failures return fixed safe messages rather than exception text,
+  paths, protocol/auth details, or command/environment values.
 - Permissions are cancelled by default in the foundation. The Permission Broker
   and any decision flow are deferred to the Task Runtime plan.
-- The default authentication path is only an ACP-advertised ChatGPT method. No
-  API-key mode and no `CODEX_PATH` environment override are configured.
+- Reusable credentials are tried before authentication. Only a typed
+  authentication-required response may invoke the advertised ChatGPT method and
+  one retry. `CODEX_PATH`, `CODEX_API_KEY`, and `OPENAI_API_KEY` are explicit
+  advanced child pass-through values; custom ACP uses a JSON argv array. The
+  runtime never logs these values or changes the forced agent mode to full access.
 
 ## Managed-path evidence boundary
 

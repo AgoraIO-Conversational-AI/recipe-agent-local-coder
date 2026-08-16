@@ -33,7 +33,7 @@ After editing, run `bun run verify:backend && bun run verify:web:api`.
 ## Deploy the Web and Backend Separately
 
 - **Web (Next.js):** build via `cd web && bun run build`. Configure `AGENT_BACKEND_URL` on the deploy target to the public URL of your FastAPI service. Serve with `bun run start` or any Node hosting platform.
-- **Backend (FastAPI):** install deps from `server/requirements.txt`, set `AGORA_APP_ID`, `AGORA_APP_CERTIFICATE`, optional `AGENT_GREETING`/`PORT`, and run `python3 server/src/server.py` or `uvicorn server.src.server:app --host 0.0.0.0 --port $PORT`.
+- **Backend (FastAPI):** install deps from `server/requirements.txt`, set `AGORA_APP_ID`, `AGORA_APP_CERTIFICATE`, optional `AGENT_GREETING`/`HOST`/`PORT`, and run `python3 server/src/server.py` or `uvicorn server.src.server:app --host 0.0.0.0 --port $PORT`.
 - The two deploys never share env vars. The browser only ever needs `/api/*` to resolve via the rewrite layer.
 
 ## Verify Locally
@@ -75,6 +75,23 @@ selection activates ACP and refreshes readiness. Do not describe the folder as
 a sandbox. A failed replacement restores the previous persisted selection.
 
 Use `GET /api/local/runtime` only to display readiness; it must not start ACP.
+For a valid saved Workspace, the local page uses `POST /api/local/runtime` to
+activate ACP explicitly after ordinary FastAPI startup completes. Normal/public
+Next deployments do not register `/api/local/*` rewrites.
+
+The launcher preflight validates macOS Apple Silicon, Bun/Node/Python, and
+usable Agora configuration without printing secrets. Advanced examples:
+
+```bash
+bun run dev:codex -- --workspace /absolute/project/path
+CODEX_PATH=/absolute/path/to/codex bun run dev:codex
+bun run dev:codex -- --acp-command-json '["custom-acp","--stdio"]'
+```
+
+`CODEX_API_KEY` and `OPENAI_API_KEY` may be passed to the child as advanced
+authentication inputs. None of these paths bypasses Workspace validation or
+changes `INITIAL_AGENT_MODE=agent`.
+
 The real `npx` package execution, ChatGPT browser authentication, native picker,
 Agora conversation, and ngrok remain manual/live checks.
 

@@ -1,6 +1,22 @@
 import path from 'node:path'
 import type { NextConfig } from 'next'
 
+export function localRuntimeRewritesEnabled(
+  optIn: string | undefined,
+  backendUrl: string | undefined,
+  nodeEnv: string | undefined,
+): boolean {
+  if (optIn !== '1' || nodeEnv === 'production' || !backendUrl) {
+    return false
+  }
+  try {
+    const hostname = new URL(backendUrl).hostname
+    return hostname === 'localhost' || hostname === '127.0.0.1' || hostname === '[::1]'
+  } catch {
+    return false
+  }
+}
+
 const nextConfig: NextConfig = {
   // Enable React strict mode
   reactStrictMode: true,
@@ -19,7 +35,7 @@ const nextConfig: NextConfig = {
       return []
     }
 
-    return [
+    const stableRewrites = [
       {
         source: '/api/get_config',
         destination: `${backendUrl}/get_config`,
@@ -32,6 +48,13 @@ const nextConfig: NextConfig = {
         source: '/api/stopAgent',
         destination: `${backendUrl}/stopAgent`,
       },
+    ]
+    if (!localRuntimeRewritesEnabled(process.env.VOICE_ACP_LOCAL_RUNTIME, backendUrl, process.env.NODE_ENV)) {
+      return stableRewrites
+    }
+
+    return [
+      ...stableRewrites,
       {
         source: '/api/local/workspace',
         destination: `${backendUrl}/local/workspace`,

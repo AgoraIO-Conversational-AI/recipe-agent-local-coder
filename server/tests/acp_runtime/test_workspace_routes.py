@@ -180,6 +180,26 @@ def test_get_runtime_reports_configuration_required_without_starting_acp(tmp_pat
     assert runtime.status().state == "configuration_required"
 
 
+def test_post_runtime_explicitly_activates_a_saved_workspace(tmp_path):
+    project = tmp_path / "project"
+    project.mkdir()
+    service = WorkspaceService(WorkspaceConfigStore(tmp_path / "workspace.json"))
+    service.select(str(project))
+    fake_acp = FakeAcpClient()
+    runtime = LocalRuntimeCoordinator(service, fake_acp)
+    app = FastAPI()
+    app.include_router(build_runtime_router(runtime=runtime))
+
+    with TestClient(app) as client:
+        before = client.get("/local/runtime")
+        activated = client.post("/local/runtime")
+
+    assert before.json()["data"]["state"] == "configuration_required"
+    assert activated.status_code == 200
+    assert activated.json()["data"]["state"] == "ready"
+    assert fake_acp.opened == [str(project)]
+
+
 def test_failed_activation_keeps_the_previous_workspace_selection(tmp_path):
     previous = tmp_path / "previous"
     next_project = tmp_path / "next"
@@ -195,7 +215,9 @@ def test_failed_activation_keeps_the_previous_workspace_selection(tmp_path):
 
     assert selected.status_code == 200
     assert failed.status_code == 503
-    assert failed.json()["detail"] == "Could not start the local Codex runtime: missing executable"
+    assert failed.json()["detail"] == (
+        "Could not start the local Codex runtime. Check the local runtime setup and retry."
+    )
     assert restored.json()["data"]["workspace"]["primary_directory"] == str(previous)
 
 

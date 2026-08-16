@@ -71,6 +71,7 @@ server/                   # Python FastAPI backend
       routes.py           # loopback-only settings/readiness routes
       picker.py           # backend-owned native macOS picker
       codex.py            # ACP child process/session client
+      launch.py           # validated --workspace launch override
       readiness.py        # one-session local readiness coordinator
     architecture_validation/
       admin.py            # Loopback-only state seeding
@@ -86,6 +87,11 @@ server/                   # Python FastAPI backend
       tools.py            # Four shared validation tools
   scripts/
     run_fake_server.py    # Patches Agent to a FakeAgent for smoke tests
+
+scripts/
+  run-local-codex.sh       # argument parsing and sibling process supervision
+  local-codex-preflight.ts # platform/runtime/Agora config validation
+  verify-local-launcher.ts # harmless launcher integration checks
 ```
 
 ## Core Files Table
@@ -93,7 +99,7 @@ server/                   # Python FastAPI backend
 | File                                                | Purpose                                                                  |
 | --------------------------------------------------- | ------------------------------------------------------------------------ |
 | `package.json` (root)                               | `concurrently`-driven dev orchestration; every workflow script.          |
-| `web/next.config.ts`                                | Rewrites `/api/*` to `${AGENT_BACKEND_URL}/...` when env is set.         |
+| `web/next.config.ts`                                | Stable rewrites plus opt-in development-only local rewrites.             |
 | `web/src/services/api.ts`                           | Browser API client: `getConfig`, `startAgent`, `stopAgent`.              |
 | `web/src/components/LandingPage.tsx`                | Session bootstrap, RTM login, renewal handler, provider wiring.          |
 | `web/src/components/ConversationComponent.tsx`      | RTC join, `AgoraVoiceAI` init, transcript/state/metrics, mic UI.         |

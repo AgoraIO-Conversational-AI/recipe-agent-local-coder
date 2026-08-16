@@ -108,13 +108,19 @@ async def test_authentication_failures_return_an_actionable_local_state(ready, f
 
 @pytest.mark.anyio
 async def test_other_acp_failures_return_an_actionable_local_state(ready, fake_acp):
-    fake_acp.open_error = RuntimeError("missing executable")
+    fake_acp.open_error = RuntimeError(
+        "missing executable for /Users/private/project with OPENAI_API_KEY=secret"
+    )
     runtime = LocalRuntimeCoordinator(ready, fake_acp)
 
     status = await runtime.start()
 
     assert status.state == "failed"
-    assert status.error == "Could not start the local Codex runtime: missing executable"
+    assert status.error == (
+        "Could not start the local Codex runtime. Check the local runtime setup and retry."
+    )
+    assert "private" not in status.error
+    assert "secret" not in status.error
 
 
 @pytest.mark.anyio

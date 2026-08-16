@@ -39,6 +39,8 @@ The sections below (Start Here, Patterns, Anti-Patterns, etc.) remain the canoni
 
 - Run `bun run dev:codex` for the loopback-only local runtime. It starts FastAPI
   on `127.0.0.1:8000` and Next on `127.0.0.1:3000`, with sibling cleanup.
+- Its preflight requires macOS Apple Silicon, Bun/Node/Python, and usable Agora
+  credentials without printing their values.
 - The browser automatically opens the Project Folder Settings gate until an
   existing directory is selected and the local runtime reports `ready`.
 - The selected resolved directory is persisted in
@@ -46,14 +48,17 @@ The sections below (Start Here, Patterns, Anti-Patterns, etc.) remain the canoni
   `VOICE_ACP_STATE_DIR` overrides the state directory. It is ACP context, not a
   filesystem sandbox.
 - The backend owns the native macOS picker and all `/local/*` routes; those
-  routes are loopback-only and reach the browser through `/api/local/*` rewrites.
+  routes are loopback-only. Next exposes `/api/local/*` only for the explicit
+  non-production local-runtime opt-in with a loopback backend URL.
 - `LocalRuntimeCoordinator` owns at most one ACP session. It starts ACP only
-  after a ready Workspace Scope and closes an old session before a replacement.
+  through explicit local activation after a ready Workspace Scope and closes an
+  old session before a replacement. Ordinary FastAPI startup never starts ACP.
 - `CodexAcpClient` owns its child process and defaults to
   `npx -y @agentclientprotocol/codex-acp@1.1.7` with `INITIAL_AGENT_MODE=agent`.
-  It uses an advertised ChatGPT auth method when available; no API-key mode is
-  configured. Advanced backend code may inject `CodexCommand` or argv, but
-  `CODEX_PATH` is not an implemented environment override in v0.1.
+  It tries reusable authentication first, then uses an advertised ChatGPT method
+  only after typed authentication-required and retries once. Advanced
+  `CODEX_PATH`, API-key pass-through, and JSON-argv custom commands never change
+  the default mode or log child environments.
 - `bun run dev:codex` does not start an Agora conversation until the user starts
   one and never starts ngrok. Do not infer live Codex or Agora acceptance from
   offline checks.
@@ -108,8 +113,9 @@ The sections below (Start Here, Patterns, Anti-Patterns, etc.) remain the canoni
 - If you change request or response contracts, update the web client, backend, contract checks, and README together.
 - Preserve the three stable quickstart routes. Treat `/api/local/*` as
   loopback-only derivative extensions, not a replacement public API.
-- Do not describe Project Folder as a sandbox or add an unreviewed
-  `CODEX_PATH` environment override; current command injection is backend-only.
+- Do not describe Project Folder as a sandbox. Keep the reviewed `CODEX_PATH`,
+  API-key pass-through, and JSON-argv custom-command paths explicit, child-only,
+  secret-safe, and pinned to `INITIAL_AGENT_MODE=agent` by default.
 
 ## Commands
 
@@ -119,6 +125,7 @@ From the repo root:
 bun install
 bun run doctor
 bun run doctor:local
+bun run preflight:codex
 bun run dev
 bun run dev:codex
 bun run verify

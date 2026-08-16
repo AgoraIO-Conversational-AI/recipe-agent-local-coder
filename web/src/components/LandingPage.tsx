@@ -13,12 +13,13 @@ import { ShareButton } from '@/components/share-button'
 import { getRuntimeStartBlock } from '@/lib/local-runtime'
 import type { LocalRuntimeStatus, WorkspaceStatus } from '@/lib/workspace'
 import { workspaceNeedsConfiguration } from '@/lib/workspace'
-import { getConfig, getLocalRuntime, getWorkspace, startAgent, stopAgent } from '@/services/api'
+import { getConfig, getWorkspace, startAgent, startLocalRuntime, stopAgent } from '@/services/api'
 import type { AgoraRenewalTokens, AgoraTokenData } from '@/types/conversation'
 
 const ConversationComponent = dynamic(() => import('@/components/ConversationComponent'), {
   ssr: false,
 })
+const localRuntimeEnabled = process.env.NEXT_PUBLIC_LOCAL_RUNTIME_ENABLED === '1'
 
 function waitForRtmConnected(rtmClient: RTMClient, timeoutMs = 600): Promise<void> {
   return new Promise((resolve) => {
@@ -90,6 +91,7 @@ export default function LandingPage() {
   }, [])
 
   useEffect(() => {
+    if (!localRuntimeEnabled) return
     let cancelled = false
     const loadReadiness = async () => {
       try {
@@ -102,7 +104,7 @@ export default function LandingPage() {
           return
         }
 
-        const runtime = await getLocalRuntime()
+        const runtime = await startLocalRuntime()
         if (cancelled) return
         setRuntimeStatus(runtime)
         setError(getRuntimeStartBlock(status, runtime))
@@ -121,17 +123,19 @@ export default function LandingPage() {
   }, [])
 
   const handleStartConversation = async () => {
-    const runtimeBlock = getRuntimeStartBlock(workspaceStatus, runtimeStatus)
-    if (runtimeBlock) {
-      setError(runtimeBlock)
+    if (localRuntimeEnabled) {
+      const runtimeBlock = getRuntimeStartBlock(workspaceStatus, runtimeStatus)
+      if (runtimeBlock) {
+        setError(runtimeBlock)
+        if (!workspaceStatus || workspaceNeedsConfiguration(workspaceStatus)) {
+          setSettingsOpen(true)
+        }
+        return
+      }
       if (!workspaceStatus || workspaceNeedsConfiguration(workspaceStatus)) {
         setSettingsOpen(true)
+        return
       }
-      return
-    }
-    if (!workspaceStatus || workspaceNeedsConfiguration(workspaceStatus)) {
-      setSettingsOpen(true)
-      return
     }
     setIsLoading(true)
     setError(null)
@@ -236,7 +240,7 @@ export default function LandingPage() {
               isLoading={isLoading}
               error={error}
               onStartConversation={handleStartConversation}
-              onOpenSettings={() => setSettingsOpen(true)}
+              onOpenSettings={localRuntimeEnabled ? () => setSettingsOpen(true) : undefined}
             />
           ) : agoraData && rtmClient ? (
             <>
@@ -253,7 +257,7 @@ export default function LandingPage() {
                       rtmClient={rtmClient}
                       onTokenWillExpire={handleTokenWillExpire}
                       onEndConversation={handleEndConversation}
-                      onOpenSettings={() => setSettingsOpen(true)}
+                      onOpenSettings={localRuntimeEnabled ? () => setSettingsOpen(true) : undefined}
                     />
                   </AgoraProvider>
                 </ErrorBoundary>
@@ -293,23 +297,25 @@ export default function LandingPage() {
         </div>
       </footer>
 
-      <ProjectFolderSettings
-        open={settingsOpen}
-        status={workspaceStatus}
-        runtimeStatus={runtimeStatus}
-        initialError={workspaceError}
-        onStatusChange={(status) => {
-          setWorkspaceStatus(status)
-          setWorkspaceError(null)
-          if (!workspaceNeedsConfiguration(status)) setSettingsOpen(false)
-        }}
-        onRuntimeStatusChange={setRuntimeStatus}
-        onClose={() => {
-          if (!getRuntimeStartBlock(workspaceStatus, runtimeStatus)) {
-            setSettingsOpen(false)
-          }
-        }}
-      />
+      {localRuntimeEnabled ? (
+        <ProjectFolderSettings
+          open={settingsOpen}
+          status={workspaceStatus}
+          runtimeStatus={runtimeStatus}
+          initialError={workspaceError}
+          onStatusChange={(status) => {
+            setWorkspaceStatus(status)
+            setWorkspaceError(null)
+            if (!workspaceNeedsConfiguration(status)) setSettingsOpen(false)
+          }}
+          onRuntimeStatusChange={setRuntimeStatus}
+          onClose={() => {
+            if (!getRuntimeStartBlock(workspaceStatus, runtimeStatus)) {
+              setSettingsOpen(false)
+            }
+          }}
+        />
+      ) : null}
     </div>
   )
 }

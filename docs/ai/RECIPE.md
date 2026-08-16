@@ -79,7 +79,7 @@ Do not recreate Agora ConvoAI integration from memory. Provider schemas, SDK bui
 | Contract | Stable shape |
 | -------- | ------------ |
 | Required backend env | `AGORA_APP_ID`, `AGORA_APP_CERTIFICATE` |
-| Optional backend env | `AGENT_GREETING`, `PORT` |
+| Optional backend env | `AGENT_GREETING`, `HOST`, `PORT` |
 | Required web deploy env | `AGENT_BACKEND_URL` |
 | Optional browser env | `NEXT_PUBLIC_AGENT_UID` |
 | `GET /api/get_config` | Query `channel?`, `uid?`; returns `data.app_id`, `data.token`, `data.uid`, `data.channel_name`, `data.agent_uid`. |
@@ -98,7 +98,8 @@ loopback FastAPI `/local/*` endpoints:
 | --- | --- | --- |
 | `GET`, `PUT`, `DELETE /api/local/workspace` | `/local/workspace` | Read, save, or clear one Project Folder Workspace Scope. |
 | `POST /api/local/workspace/browse` | `/local/workspace/browse` | Use the backend-owned native macOS picker. |
-| `GET /api/local/runtime` | `/local/runtime` | Read safe ACP readiness state. |
+| `GET /api/local/runtime` | `/local/runtime` | Read safe ACP readiness state without starting ACP. |
+| `POST /api/local/runtime` | `/local/runtime` | Explicitly activate ACP for a valid saved Workspace. |
 
 `bun run dev:codex` starts the loopback backend and frontend. The browser gate
 requires one existing Project Folder before conversation start. That resolved
@@ -106,11 +107,17 @@ folder is persisted locally and passed to ACP as session context; it is not a
 filesystem sandbox. The Codex profile supports one primary directory with no
 additional directories.
 
-`CodexAcpClient` starts one child process/session at a time through ACP. Its
-default is `npx -y @agentclientprotocol/codex-acp@1.1.7` with
-`INITIAL_AGENT_MODE=agent`, and it uses ChatGPT authentication only if the
-agent advertises it. Backend code can inject `CodexCommand` or argv; no
-`CODEX_PATH` environment override or API-key auth mode is implemented in v0.1.
+Ordinary FastAPI startup does not start ACP. The local flow explicitly activates
+`CodexAcpClient`, which starts one child process/session at a time. Its default
+is `npx -y @agentclientprotocol/codex-acp@1.1.7` with
+`INITIAL_AGENT_MODE=agent`. It tries reusable credentials before using an
+advertised ChatGPT method on typed authentication-required and retrying once.
+Advanced `CODEX_PATH`/API-key child pass-through and JSON-argv custom commands
+do not select full access or log their environment.
+
+Next registers `/api/local/*` only for an explicit non-production local-runtime
+opt-in and a loopback backend URL. Normal and public web deployments retain only
+the three stable quickstart rewrites.
 
 The extension's fake ACP, local proxy, fake FastAPI, and build checks are
 offline-safe. They do not validate real `npx` execution, browser authentication,

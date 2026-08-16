@@ -13,7 +13,7 @@ type QuickstartConversationLayoutProps = {
 	visualizer: ReactNode;
 	controls: ReactNode;
 	onEndConversation: () => void;
-	onOpenSettings: () => void;
+	onOpenSettings?: () => void;
 };
 
 export function QuickstartConversationLayout({
@@ -46,17 +46,19 @@ export function QuickstartConversationLayout({
 
 				<div className="flex items-center gap-2 md:pr-1">
 					{statusPanel}
-					<Button
-						variant="secondary"
-						size="sm"
-						className="h-10 rounded-xl px-3 text-xs font-medium transition-transform duration-150 active:scale-[0.96] md:h-8 md:rounded-lg"
-						onClick={onOpenSettings}
-						aria-label="Open Project Folder settings"
-						title="Project Folder settings"
-					>
-						<Settings2 className="h-4 w-4" aria-hidden="true" />
-						<span className="hidden sm:inline">Settings</span>
-					</Button>
+					{onOpenSettings ? (
+						<Button
+							variant="secondary"
+							size="sm"
+							className="h-10 rounded-xl px-3 text-xs font-medium transition-transform duration-150 active:scale-[0.96] md:h-8 md:rounded-lg"
+							onClick={onOpenSettings}
+							aria-label="Open Project Folder settings"
+							title="Project Folder settings"
+						>
+							<Settings2 className="h-4 w-4" aria-hidden="true" />
+							<span className="hidden sm:inline">Settings</span>
+						</Button>
+					) : null}
 					<Button
 						variant="destructive"
 						size="sm"

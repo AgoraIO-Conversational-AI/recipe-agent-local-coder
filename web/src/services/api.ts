@@ -98,6 +98,13 @@ export async function getLocalRuntime(): Promise<LocalRuntimeStatus> {
   )
 }
 
+export async function startLocalRuntime(): Promise<LocalRuntimeStatus> {
+  return readLocalResponse<LocalRuntimeStatus>(
+    await fetch(`${API_BASE_URL}/local/runtime`, { method: 'POST' }),
+    'Failed to start the local Codex runtime',
+  )
+}
+
 export async function browseWorkspace(): Promise<WorkspaceStatus> {
   return readWorkspaceResponse(await fetch(`${API_BASE_URL}/local/workspace/browse`, { method: 'POST' }))
 }

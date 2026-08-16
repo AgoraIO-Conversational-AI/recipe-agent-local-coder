@@ -96,6 +96,7 @@ async function waitForHealthyBackend(baseUrl: string, timeoutMs: number) {
 }
 
 async function main() {
+  const mutableEnv = process.env as Record<string, string | undefined>
   const projectRoot = process.cwd()
   const serverRoot = path.resolve(projectRoot, '..', 'server')
   const venvPython = path.join(serverRoot, 'venv', 'bin', 'python')
@@ -120,6 +121,8 @@ async function main() {
   const port = 43120 + Math.floor(Math.random() * 20)
   const backendUrl = `http://127.0.0.1:${port}`
   const originalBackendUrl = process.env.AGENT_BACKEND_URL
+  const originalLocalRuntime = process.env.VOICE_ACP_LOCAL_RUNTIME
+  const originalNodeEnv = process.env.NODE_ENV
 
   const serverProcess = bunRuntime.Bun.spawn({
     cmd: [venvPython, 'scripts/run_fake_server.py'],
@@ -137,7 +140,9 @@ async function main() {
   try {
     await waitForHealthyBackend(backendUrl, 10_000)
 
-    process.env.AGENT_BACKEND_URL = backendUrl
+    mutableEnv.AGENT_BACKEND_URL = backendUrl
+    mutableEnv.VOICE_ACP_LOCAL_RUNTIME = '1'
+    mutableEnv.NODE_ENV = 'development'
 
     const response = await requestViaRewrite('/api/get_config?uid=4321&channel=python-smoke')
     const body = await getJson(response)
@@ -178,6 +183,41 @@ async function main() {
       'GET /api/local/runtime should not start ACP without a Project Folder',
     )
 
+    const startRuntimeResponse = await requestViaRewrite('/api/local/runtime', { method: 'POST' })
+    const startRuntimeBody = await getJson(startRuntimeResponse)
+    assert(startRuntimeResponse.status === 200, 'POST /api/local/runtime should be available only in local mode')
+    assert(
+      (startRuntimeBody.data as Record<string, unknown> | undefined)?.state === 'configuration_required',
+      'POST /api/local/runtime should not start ACP without a Project Folder',
+    )
+
+    const invalidWorkspaceResponse = await requestViaRewrite('/api/local/workspace', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ path: 'relative-project' }),
+    })
+    const invalidWorkspaceBody = await getJson(invalidWorkspaceResponse)
+    assert(invalidWorkspaceResponse.status === 400, 'invalid Project Folder selection should return 400')
+    assert(
+      invalidWorkspaceBody.detail === 'Project Folder must be an absolute existing directory',
+      'Project Folder validation should return a bounded error',
+    )
+
+    const invalidShapeResponse = await requestViaRewrite('/api/local/workspace', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({}),
+    })
+    assert(invalidShapeResponse.status === 422, 'missing Project Folder path should return FastAPI validation error')
+
+    const clearWorkspaceResponse = await requestViaRewrite('/api/local/workspace', { method: 'DELETE' })
+    const clearWorkspaceBody = await getJson(clearWorkspaceResponse)
+    assert(clearWorkspaceResponse.status === 200, 'DELETE /api/local/workspace should proxy successfully')
+    assert(
+      (clearWorkspaceBody.data as Record<string, unknown> | undefined)?.state === 'unconfigured',
+      'DELETE /api/local/workspace should return the cleared status',
+    )
+
     const startResponse = await requestViaRewrite('/api/startAgent', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -207,9 +247,19 @@ async function main() {
     console.log('Local FastAPI app proxy smoke check passed')
   } finally {
     if (originalBackendUrl) {
-      process.env.AGENT_BACKEND_URL = originalBackendUrl
+      mutableEnv.AGENT_BACKEND_URL = originalBackendUrl
     } else {
-      process.env.AGENT_BACKEND_URL = ''
+      mutableEnv.AGENT_BACKEND_URL = ''
+    }
+    if (originalLocalRuntime) {
+      mutableEnv.VOICE_ACP_LOCAL_RUNTIME = originalLocalRuntime
+    } else {
+      mutableEnv.VOICE_ACP_LOCAL_RUNTIME = ''
+    }
+    if (originalNodeEnv) {
+      mutableEnv.NODE_ENV = originalNodeEnv
+    } else {
+      mutableEnv.NODE_ENV = ''
     }
 
     serverProcess.kill()

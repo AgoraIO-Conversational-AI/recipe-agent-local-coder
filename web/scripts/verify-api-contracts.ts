@@ -4,11 +4,13 @@ import path from 'node:path'
 import nextConfig from '../next.config'
 import {
   browseWorkspace,
+  clearWorkspace,
   getConfig,
   getLocalRuntime,
   getWorkspace,
   selectWorkspace,
   startAgent,
+  startLocalRuntime,
   stopAgent,
 } from '../src/services/api'
 
@@ -52,29 +54,41 @@ function getRequestBody(init: RequestInit | undefined) {
 }
 
 async function verifyRewriteContract() {
+  const mutableEnv = process.env as Record<string, string | undefined>
   const originalBackendUrl = process.env.AGENT_BACKEND_URL
-  process.env.AGENT_BACKEND_URL = 'http://localhost:8000/'
+  const originalLocalRuntime = process.env.VOICE_ACP_LOCAL_RUNTIME
+  const originalNodeEnv = process.env.NODE_ENV
+  mutableEnv.AGENT_BACKEND_URL = 'http://localhost:8000/'
+  mutableEnv.VOICE_ACP_LOCAL_RUNTIME = ''
+  mutableEnv.NODE_ENV = 'development'
 
   try {
-    const rewrites = await getRewrites()
+    const stableRewrites = await getRewrites()
     assert(
-      rewrites.some(
+      stableRewrites.some(
         (rewrite) => rewrite.source === '/api/get_config' && rewrite.destination === 'http://localhost:8000/get_config',
       ),
       'next.config.ts should rewrite /api/get_config to /get_config on the Python backend',
     )
     assert(
-      rewrites.some(
+      stableRewrites.some(
         (rewrite) => rewrite.source === '/api/startAgent' && rewrite.destination === 'http://localhost:8000/startAgent',
       ),
       'next.config.ts should rewrite /api/startAgent to /startAgent on the Python backend',
     )
     assert(
-      rewrites.some(
+      stableRewrites.some(
         (rewrite) => rewrite.source === '/api/stopAgent' && rewrite.destination === 'http://localhost:8000/stopAgent',
       ),
       'next.config.ts should rewrite /api/stopAgent to /stopAgent on the Python backend',
     )
+    assert(
+      !stableRewrites.some((rewrite) => rewrite.source.startsWith('/api/local/')),
+      'normal web deployments must not publish local runtime rewrites',
+    )
+
+    mutableEnv.VOICE_ACP_LOCAL_RUNTIME = '1'
+    const rewrites = await getRewrites()
     assert(
       rewrites.some(
         (rewrite) =>
@@ -99,9 +113,19 @@ async function verifyRewriteContract() {
     )
   } finally {
     if (originalBackendUrl) {
-      process.env.AGENT_BACKEND_URL = originalBackendUrl
+      mutableEnv.AGENT_BACKEND_URL = originalBackendUrl
     } else {
-      process.env.AGENT_BACKEND_URL = ''
+      mutableEnv.AGENT_BACKEND_URL = ''
+    }
+    if (originalLocalRuntime) {
+      mutableEnv.VOICE_ACP_LOCAL_RUNTIME = originalLocalRuntime
+    } else {
+      mutableEnv.VOICE_ACP_LOCAL_RUNTIME = ''
+    }
+    if (originalNodeEnv) {
+      mutableEnv.NODE_ENV = originalNodeEnv
+    } else {
+      mutableEnv.NODE_ENV = ''
     }
   }
 }
@@ -199,6 +223,13 @@ async function verifyApiClientRequests() {
       if (init?.method === 'GET') {
         return Response.json({ code: 0, data: ready, msg: 'success' })
       }
+      if (init?.method === 'DELETE') {
+        return Response.json({
+          code: 0,
+          data: { ...ready, state: 'unconfigured', workspace: null },
+          msg: 'success',
+        })
+      }
       assert(init?.method === 'PUT', 'Project Folder manual selection should use PUT')
       assert(getRequestBody(init).path === '/tmp/project', 'Project Folder PUT should include path')
       return Response.json({ code: 0, data: ready, msg: 'success' })
@@ -227,7 +258,10 @@ async function verifyApiClientRequests() {
     }
 
     if (url.pathname === '/api/local/runtime') {
-      assert(init?.method === 'GET', 'GET /api/local/runtime should use GET')
+      assert(
+        init?.method === 'GET' || init?.method === 'POST',
+        'local runtime readiness should use GET or explicit POST activation',
+      )
       return Response.json({
         code: 0,
         data: {
@@ -270,6 +304,10 @@ async function verifyApiClientRequests() {
     await selectWorkspace('/tmp/project')
     const runtime = await getLocalRuntime()
     assert(runtime.state === 'ready', 'GET /api/local/runtime should return readiness')
+    const startedRuntime = await startLocalRuntime()
+    assert(startedRuntime.state === 'ready', 'POST /api/local/runtime should return readiness')
+    const clearedWorkspace = await clearWorkspace()
+    assert(clearedWorkspace.state === 'unconfigured', 'DELETE /api/local/workspace should clear the selection')
 
     assert(
       JSON.stringify(seenPaths) ===
@@ -281,8 +319,41 @@ async function verifyApiClientRequests() {
           '/api/local/workspace/browse',
           '/api/local/workspace',
           '/api/local/runtime',
+          '/api/local/runtime',
+          '/api/local/workspace',
         ]),
       'API client should call the unversioned /api paths',
+    )
+  } finally {
+    globalThis.fetch = originalFetch
+  }
+}
+
+async function verifyLocalApiValidationErrors() {
+  const originalFetch = globalThis.fetch
+  globalThis.fetch = (async (_input, init) => {
+    if (init?.method === 'PUT') {
+      return Response.json({ detail: 'Project Folder must be an absolute existing directory' }, { status: 400 })
+    }
+    return Response.json({ detail: 'Project Folder selection was cancelled' }, { status: 409 })
+  }) as typeof fetch
+
+  try {
+    await selectWorkspace('relative').then(
+      () => assert(false, 'invalid Project Folder selection should reject'),
+      (error) =>
+        assert(
+          error instanceof Error && error.message === 'Project Folder must be an absolute existing directory',
+          'Project Folder validation should preserve the bounded backend error',
+        ),
+    )
+    await browseWorkspace().then(
+      () => assert(false, 'cancelled Project Folder browse should reject'),
+      (error) =>
+        assert(
+          error instanceof Error && error.message === 'Project Folder selection was cancelled',
+          'picker cancellation should preserve the bounded backend error',
+        ),
     )
   } finally {
     globalThis.fetch = originalFetch
@@ -293,6 +364,7 @@ async function main() {
   await verifyRewriteContract()
   await verifyRouteHandlersRemoved()
   await verifyApiClientRequests()
+  await verifyLocalApiValidationErrors()
   console.log('API contract checks passed')
 }
 

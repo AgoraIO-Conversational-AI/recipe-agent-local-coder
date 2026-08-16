@@ -37,6 +37,15 @@ def fake_env(monkeypatch):
     monkeypatch.setattr(dotenv, "load_dotenv", lambda *a, **k: False)
     for key, value in FAKE_ENV.items():
         monkeypatch.setenv(key, value)
+    for key in (
+        "VOICE_ACP_WORKSPACE",
+        "VOICE_ACP_COMMAND_JSON",
+        "CODEX_PATH",
+        "CODEX_API_KEY",
+        "OPENAI_API_KEY",
+        "INITIAL_AGENT_MODE",
+    ):
+        monkeypatch.delenv(key, raising=False)
     return dict(FAKE_ENV)
 
 
