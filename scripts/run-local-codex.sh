@@ -1,7 +1,6 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-runner=""
 backend_command="${LOCAL_BACKEND_COMMAND:-bun run dev:backend:codex}"
 frontend_command="${LOCAL_FRONTEND_COMMAND:-bun run dev:frontend:codex}"
 
@@ -29,18 +28,9 @@ while [[ $# -gt 0 ]]; do
 done
 
 export VOICE_ACP_LOCAL_RUNTIME=1
+grace_seconds="${LOCAL_LAUNCHER_GRACE_SECONDS:-10}"
 
-cleanup() {
-  if [[ -n "$runner" ]] && kill -0 "$runner" 2>/dev/null; then
-    kill -INT "$runner" 2>/dev/null || true
-    wait "$runner" || true
-  fi
-}
-
-trap cleanup EXIT INT TERM
-
-concurrently -k --success first -n backend,frontend -c blue,green \
+exec python3 scripts/supervise-local.py \
+  --grace-seconds "$grace_seconds" \
   "$backend_command" \
-  "$frontend_command" &
-runner=$!
-wait "$runner"
+  "$frontend_command"
