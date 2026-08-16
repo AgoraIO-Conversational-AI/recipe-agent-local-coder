@@ -37,12 +37,13 @@ configuration, and Agora behavior do not change.
   result.
 - The first SIGINT or SIGTERM starts shutdown and is forwarded once to the
   `concurrently` root process, not broadcast to its process group.
-- Later signals while shutdown is in progress do not trigger duplicate graceful
-  shutdown delivery.
+- A second SIGINT while graceful shutdown is in progress skips the remaining
+  wait and sends SIGKILL to the isolated process group.
 - The supervisor waits for the group to exit and does not leave backend,
   frontend, or ACP descendants running.
-- If graceful cleanup exceeds its bounded deadline, the supervisor may escalate
-  against the isolated process group so unresponsive descendants cannot remain.
+- If graceful cleanup exceeds 10 seconds, the supervisor sends SIGKILL to the
+  isolated process group so unresponsive descendants cannot remain. SIGTERM
+  uses the same graceful-first, deadline-bounded path.
 - User interruption may return a conventional non-zero interrupted exit status;
   clean logs and complete cleanup are the required behavior.
 
@@ -67,7 +68,9 @@ that:
 3. asserts both fake siblings exit;
 4. asserts the supervisor signals only the `concurrently` root during graceful
    shutdown and sibling shutdown delivery is not duplicated; and
-5. asserts launcher output contains no traceback.
+5. asserts a second SIGINT and the 10-second deadline can each force cleanup;
+   and
+6. asserts launcher output contains no traceback.
 
 Retain the existing tests for opaque advanced overrides, invalid arguments,
 one-child failure, SIGINT cleanup, and SIGTERM cleanup. Then rerun the real
