@@ -38,11 +38,11 @@ class FakeAcpClient:
 class FakeWorkspaceSwitchGuard:
     def __init__(self) -> None:
         self.reason: str | None = None
-        self.calls: list[tuple[str | None, str]] = []
+        self.calls: list[tuple[str | None, str, str | None]] = []
 
-    def check(self, previous, path: str) -> str | None:
+    def check(self, previous, change) -> str | None:
         directory = previous.workspace.primary_directory if previous.workspace else None
-        self.calls.append((directory, path))
+        self.calls.append((directory, change.operation, change.path))
         return self.reason
 
 
@@ -219,3 +219,24 @@ def test_switch_guard_blocks_before_persistence_or_acp_session_replacement(tmp_p
     assert restored.json()["data"]["workspace"]["primary_directory"] == str(previous)
     assert fake_acp.opened == [str(previous)]
     assert fake_acp.close_calls == 0
+
+
+def test_switch_guard_blocks_clear_before_session_close_or_store_mutation(tmp_path):
+    project = tmp_path / "project"
+    project.mkdir()
+    guard = FakeWorkspaceSwitchGuard()
+    app, _picker, _runtime, fake_acp = make_app(tmp_path, switch_guard=guard)
+
+    with TestClient(app) as client:
+        selected = client.put("/local/workspace", json={"path": str(project)})
+        guard.reason = "Finish or resolve the pending permission before clearing Project Folder."
+        blocked = client.delete("/local/workspace")
+        restored = client.get("/local/workspace")
+
+    assert selected.status_code == 200
+    assert blocked.status_code == 409
+    assert blocked.json()["detail"] == guard.reason
+    assert restored.json()["data"]["workspace"]["primary_directory"] == str(project)
+    assert fake_acp.opened == [str(project)]
+    assert fake_acp.close_calls == 0
+    assert guard.calls[-1] == (str(project), "clear", None)

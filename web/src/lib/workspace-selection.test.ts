@@ -1,0 +1,43 @@
+import { expect, test } from 'bun:test'
+
+import { getRuntimeStartBlock } from './local-runtime'
+import type { LocalRuntimeStatus, WorkspaceStatus } from './workspace'
+import { selectWorkspaceWithRuntimeRefresh } from './workspace-selection'
+
+const workspace: WorkspaceStatus = {
+  state: 'ready',
+  profile: {
+    id: 'codex',
+    label: 'Codex',
+    requires_primary_directory: true,
+    supports_additional_directories: false,
+  },
+  workspace: { id: 'workspace-a', label: 'project', primary_directory: '/tmp/project' },
+}
+
+const failedRuntime: LocalRuntimeStatus = {
+  state: 'failed',
+  workspace,
+  error: 'Could not start the local Codex runtime: missing executable',
+}
+
+test('failed replacement invalidates stale ready runtime before Start Conversation can reach Agora', async () => {
+  const published: Array<LocalRuntimeStatus | null> = []
+  let agoraCalls = 0
+
+  await expect(
+    selectWorkspaceWithRuntimeRefresh(
+      async () => {
+        throw new Error('Could not start the local Codex runtime: missing executable')
+      },
+      async () => failedRuntime,
+      (runtime) => published.push(runtime),
+    ),
+  ).rejects.toThrow('missing executable')
+
+  expect(published).toEqual([null, failedRuntime])
+  const block = getRuntimeStartBlock(workspace, published.at(-1) ?? null)
+  if (!block) agoraCalls += 1
+  expect(block).toContain('missing executable')
+  expect(agoraCalls).toBe(0)
+})

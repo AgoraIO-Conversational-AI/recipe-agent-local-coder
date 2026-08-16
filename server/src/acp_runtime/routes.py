@@ -1,7 +1,8 @@
 """Loopback-only Project Folder configuration routes."""
 
 from dataclasses import asdict
-from typing import Protocol
+from dataclasses import dataclass
+from typing import Literal, Protocol
 
 from fastapi import APIRouter, HTTPException, Request
 from pydantic import BaseModel
@@ -16,18 +17,26 @@ class SelectWorkspaceRequest(BaseModel):
     path: str
 
 
-class WorkspaceSwitchGuard(Protocol):
-    """Optional future Work/permission gate before a Project Folder switch."""
+@dataclass(frozen=True)
+class WorkspaceChange:
+    """One explicit Workspace mutation a future Work/permission gate may block."""
 
-    def check(self, previous: WorkspaceStatus, path: str) -> str | None:
+    operation: Literal["replace", "clear"]
+    path: str | None = None
+
+
+class WorkspaceSwitchGuard(Protocol):
+    """Optional future Work/permission gate before a Workspace mutation."""
+
+    def check(self, previous: WorkspaceStatus, change: WorkspaceChange) -> str | None:
         """Return a stable conflict message, or None when a switch is allowed."""
 
 
 class AllowWorkspaceSwitch:
     """Default guard for the current runtime, which has no Work state yet."""
 
-    def check(self, previous: WorkspaceStatus, path: str) -> str | None:
-        del previous, path
+    def check(self, previous: WorkspaceStatus, change: WorkspaceChange) -> str | None:
+        del previous, change
         return None
 
 
@@ -75,6 +84,10 @@ def build_workspace_router(
     @router.delete("")
     async def clear_workspace(request: Request) -> dict[str, object]:
         require_loopback(request)
+        previous = service.status()
+        conflict = resolved_guard.check(previous, WorkspaceChange(operation="clear"))
+        if conflict is not None:
+            raise HTTPException(status_code=409, detail=conflict)
         await runtime.close()
         return _envelope(service.clear())
 
@@ -105,7 +118,9 @@ async def _select_and_activate(
 ) -> dict[str, object]:
     """Persist a new folder only when its replacement ACP session is ready."""
     previous = service.status()
-    conflict = switch_guard.check(previous, path)
+    conflict = switch_guard.check(
+        previous, WorkspaceChange(operation="replace", path=path)
+    )
     if conflict is not None:
         raise HTTPException(status_code=409, detail=conflict)
     try:

@@ -296,6 +296,7 @@ export default function LandingPage() {
       <ProjectFolderSettings
         open={settingsOpen}
         status={workspaceStatus}
+        runtimeStatus={runtimeStatus}
         initialError={workspaceError}
         onStatusChange={(status) => {
           setWorkspaceStatus(status)
@@ -304,7 +305,7 @@ export default function LandingPage() {
         }}
         onRuntimeStatusChange={setRuntimeStatus}
         onClose={() => {
-          if (workspaceStatus && !workspaceNeedsConfiguration(workspaceStatus)) {
+          if (!getRuntimeStartBlock(workspaceStatus, runtimeStatus)) {
             setSettingsOpen(false)
           }
         }}

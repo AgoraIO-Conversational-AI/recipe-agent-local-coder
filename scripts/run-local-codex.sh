@@ -2,6 +2,8 @@
 set -euo pipefail
 
 runner=""
+backend_command="${LOCAL_BACKEND_COMMAND:-bun run dev:backend:codex}"
+frontend_command="${LOCAL_FRONTEND_COMMAND:-bun run dev:frontend:codex}"
 
 cleanup() {
   if [[ -n "$runner" ]] && kill -0 "$runner" 2>/dev/null; then
@@ -13,7 +15,7 @@ cleanup() {
 trap cleanup EXIT INT TERM
 
 concurrently -k --success first -n backend,frontend -c blue,green \
-  "bun run dev:backend:codex" \
-  "bun run dev:frontend:codex" &
+  "$backend_command" \
+  "$frontend_command" &
 runner=$!
 wait "$runner"

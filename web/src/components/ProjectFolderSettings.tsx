@@ -6,20 +6,23 @@ import { useEffect, useState } from 'react'
 import { Button } from '@/components/ui/button'
 import type { LocalRuntimeStatus, WorkspaceStatus } from '@/lib/workspace'
 import { workspaceNeedsConfiguration } from '@/lib/workspace'
+import { selectWorkspaceWithRuntimeRefresh } from '@/lib/workspace-selection'
 import { browseWorkspace, getLocalRuntime, selectWorkspace } from '@/services/api'
 
 type ProjectFolderSettingsProps = {
   open: boolean
   status: WorkspaceStatus | null
+  runtimeStatus: LocalRuntimeStatus | null
   initialError: string | null
   onStatusChange: (status: WorkspaceStatus) => void
-  onRuntimeStatusChange: (status: LocalRuntimeStatus) => void
+  onRuntimeStatusChange: (status: LocalRuntimeStatus | null) => void
   onClose: () => void
 }
 
 export function ProjectFolderSettings({
   open,
   status,
+  runtimeStatus,
   initialError,
   onStatusChange,
   onRuntimeStatusChange,
@@ -29,6 +32,7 @@ export function ProjectFolderSettings({
   const [isBusy, setIsBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const mustConfigure = status ? workspaceNeedsConfiguration(status) : true
+  const canClose = !mustConfigure && runtimeStatus?.state === 'ready'
 
   useEffect(() => {
     if (!open) {
@@ -38,13 +42,13 @@ export function ProjectFolderSettings({
   }, [open])
 
   useEffect(() => {
-    if (!open || mustConfigure) return
+    if (!open || !canClose) return
     const handleKeyDown = (event: KeyboardEvent) => {
       if (event.key === 'Escape') onClose()
     }
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [mustConfigure, onClose, open])
+  }, [canClose, onClose, open])
 
   if (!open) return null
 
@@ -52,13 +56,8 @@ export function ProjectFolderSettings({
     setIsBusy(true)
     setError(null)
     try {
-      const nextStatus = await select()
-      const runtime = await getLocalRuntime()
-      if (runtime.state !== 'ready') {
-        throw new Error(runtime.error ?? 'The local Codex runtime is not ready')
-      }
-      onRuntimeStatusChange(runtime)
-      onStatusChange(nextStatus)
+      const { workspace } = await selectWorkspaceWithRuntimeRefresh(select, getLocalRuntime, onRuntimeStatusChange)
+      onStatusChange(workspace)
     } catch (nextError) {
       setError(nextError instanceof Error ? nextError.message : 'Could not select the Project Folder')
     } finally {
@@ -91,7 +90,7 @@ export function ProjectFolderSettings({
               </p>
             </div>
           </div>
-          {!mustConfigure ? (
+          {canClose ? (
             <button
               type="button"
               onClick={onClose}
