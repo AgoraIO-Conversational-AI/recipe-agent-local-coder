@@ -5,7 +5,6 @@ from datetime import datetime
 from typing import Literal, Optional
 
 
-VoiceLlmPath = Literal["managed", "custom"]
 PermissionDecision = Literal["allow", "reject"]
 SyntheticWorkState = Literal["accepted", "cancelled"]
 
@@ -43,7 +42,6 @@ class RuntimeSessionBinding:
     session_id: str
     scenario_id: str
     mcp_bearer: str
-    llm_callback_bearer: str
     expires_at: datetime
 
     @classmethod
@@ -57,7 +55,6 @@ class RuntimeSessionBinding:
             session_id=session_id,
             scenario_id=scenario_id,
             mcp_bearer=f"test-mcp-{session_id}",
-            llm_callback_bearer=f"test-llm-{session_id}",
             expires_at=datetime.now(timezone.utc) + timedelta(minutes=5),
         )
 

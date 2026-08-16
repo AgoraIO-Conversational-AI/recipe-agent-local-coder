@@ -70,9 +70,9 @@ Frontend calls these as `/api/*`. Next rewrites those calls to `AGENT_BACKEND_UR
 
 Token007 (AccessToken2) — generated from `AGORA_APP_ID` + `AGORA_APP_CERTIFICATE` only. No API_KEY/API_SECRET needed. The SDK handles token generation and API auth internally.
 
-## Architecture-validation ingress
+## Managed-path evidence ingress
 
-The temporary Voice LLM comparison adds two ASGI surfaces in one local process so they can share process-local validation state:
+The Managed Voice LLM evidence harness adds two ASGI surfaces in one local process so they can share process-local validation state:
 
 ```text
 Browser -> loopback FastAPI:8000 -> agent lifecycle and local seed controls
@@ -83,13 +83,11 @@ Agora Cloud -> ngrok -> public ASGI:8001 -> authenticated /mcp only
 
 The live runner must own both listeners in one process. Running the public app separately would create another in-memory capability registry and is unsupported. The four MCP tools operate on synthetic receipts only; they do not start ACP, coding agents, commands, or file operations.
 
-For the Managed candidate, the existing authenticated Agent session replaces the complete `llm.system_messages` list with the base prompt plus at most one bounded current permission. The same session announces the question with one `say(..., priority="APPEND", interruptable=True)` call. No separate Agora REST credentials are required.
+The existing authenticated Agent session replaces the complete `llm.system_messages` list with the base prompt plus at most one bounded current permission. The same session announces the question with one `say(..., priority="APPEND", interruptable=True)` call. No separate model-provider credentials or public LLM callback are required.
 
-For the Custom candidate, the public app additionally mounts `/llm/chat/completions`. A separate runner-issued callback capability identifies the session; the handler removes stale validation context, injects the same bounded current permission before the latest user message, and forwards one real OpenAI-compatible streaming request. It does not persist history, execute tools, or transform SSE tool-call chunks.
+`server/src/architecture_validation/config.py` reads the versioned evidence controls once. `server/src/agent.py` always builds the Agora-managed `OpenAI` provider with the prompt, model controls, history, MCP endpoint, bearer header, allowed tools, STT, TTS, turn detection, and session settings.
 
-`server/src/architecture_validation/config.py` reads the versioned comparison controls once. `server/src/agent.py` builds either `OpenAI` or `CustomLLM` with identical prompt, model controls, history, MCP endpoint, bearer header, allowed tools, STT, TTS, turn detection, and session settings. Only the provider class, callback URL, and callback bearer differ.
-
-The interactive runner owns both Uvicorn listeners, rotates the active scenario on the same per-session capabilities, seeds only synthetic state, and appends recursively redacted JSONL evidence. Invalidated operator/setup attempts remain in evidence under unique IDs and are rerun. The report applies safety disqualifiers before tool accuracy, configuration burden, p95 latency, and failure rate.
+The interactive runner owns both Uvicorn listeners, rotates the active scenario on the same per-session capability, seeds only synthetic state, and appends recursively redacted JSONL evidence. Invalidated operator/setup attempts remain in evidence under unique IDs and are rerun. The harness is optional and consumes live Agora usage when run.
 
 ## Detailed Documentation
 

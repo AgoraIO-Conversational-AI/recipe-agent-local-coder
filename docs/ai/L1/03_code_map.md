@@ -64,15 +64,13 @@ server/                   # Python FastAPI backend
     agent.py              # Agent class: start, stop, vendor chain
     architecture_validation/
       admin.py            # Loopback-only state seeding
-      config.py           # Fail-closed shared candidate/model controls
+      config.py           # Fail-closed Managed-path evidence controls
       context.py          # Shared bounded permission projection
-      custom_llm.py       # Authenticated context injection and SSE forwarding
       managed.py          # Agent-session update and APPEND speech adapter
       mcp_app.py          # Authenticated FastMCP tool surface
       public_server.py    # Minimal public ASGI app factory
       recorder.py         # Append-only recursively redacted evidence
-      report.py           # Deterministic safety-first comparison report
-      runner.py           # Interactive dual-listener live matrix
+      runner.py           # Optional interactive dual-listener evidence run
       runtime.py          # Process-local shared state
       state.py            # Capability, permission, and synthetic Work state
       tools.py            # Four shared validation tools
@@ -95,7 +93,7 @@ server/                   # Python FastAPI backend
 | `web/scripts/verify-local-fastapi.ts`               | Spawns `server/scripts/run_fake_server.py`, exercises full path.         |
 | `server/src/server.py`                              | FastAPI app, env loading, three routes, response envelope, error mapping.|
 | `server/src/agent.py`                               | `Agent` class — vendor chain + async session lifecycle.                  |
-| `server/src/architecture_validation/`               | Temporary Voice LLM comparison state, tools, and isolated public ingress.|
+| `server/src/architecture_validation/`               | Managed Voice LLM evidence state, tools, and isolated public ingress.    |
 | `server/scripts/run_fake_server.py`                 | Patches `server.agent` to `FakeAgent` for verification.                  |
 
 ## Module Boundaries
@@ -109,7 +107,7 @@ server/                   # Python FastAPI backend
 
 - **No `web/src/hooks/`** and **no `useAgoraConnection.ts`** — RTC/RTM orchestration lives in `LandingPage.tsx` and `ConversationComponent.tsx`.
 - **No `pyproject.toml`** — Python deps are pip + `requirements.txt`.
-- **`server/tests/architecture_validation/`** — pytest coverage for the temporary Voice LLM comparison; ordinary backend routes still use the bun-spawned smoke scripts.
+- **`server/tests/architecture_validation/`** — pytest coverage for Managed-path context, tools, and route isolation; ordinary backend routes still use the bun-spawned smoke scripts.
 - **No `Makefile`** — `bun run …` is the canonical entry point.
 - **No `app/api/**/route.ts`** under `web/` — `verify-api-contracts.ts` enforces this.
 

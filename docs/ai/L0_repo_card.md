@@ -1,6 +1,6 @@
 # agora-conversational-ai-demo (python) — Repo Card
 
-> Next.js web client + Python FastAPI backend for an Agora Conversational AI voice agent with an isolated Voice LLM architecture-validation surface.
+> Next.js web client + Python FastAPI backend for an Agora Conversational AI voice agent, with an optional isolated Managed Voice LLM evidence surface.
 
 ## Identity
 

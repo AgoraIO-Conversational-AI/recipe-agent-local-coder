@@ -4,4 +4,4 @@ This recipe is derived from [Agora's Python Agent Quickstart](https://github.com
 
 The upstream MIT license is retained unchanged in [`LICENSE`](./LICENSE).
 
-The architecture-validation-only Custom LLM adapter follows the endpoint shape demonstrated by [Agora's Custom LLM recipe](https://github.com/AgoraIO-Conversational-AI/recipe-agent-custom-llm) at commit `3ae43f2ca294e83b0afad895d859abaf7cd9d631`. No source file is copied from that repository.
+Agora's [Custom LLM recipe](https://github.com/AgoraIO-Conversational-AI/recipe-agent-custom-llm) at commit `3ae43f2ca294e83b0afad895d859abaf7cd9d631` informed an architecture experiment that was removed when v0.1 selected the Managed Voice LLM path. No source file was copied from that repository.

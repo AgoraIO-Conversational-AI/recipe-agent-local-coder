@@ -1,21 +1,28 @@
-# Voice LLM architecture validation
+# Managed Voice LLM evidence harness
 
-This directory contains a bounded comparison of two Agora Voice LLM paths for the Voice-to-ACP Local recipe:
+This directory contains an optional evidence harness for the Managed Voice LLM path selected for Voice-to-ACP Local v0.1. It uses the versioned scenario corpus in [`corpus.json`](./corpus.json) to exercise bounded permission context and synthetic MCP tools. It does not run ACP, Codex, commands, file operations, a durable Task Runtime, or production Work storage.
 
-- **Managed:** Agora-managed OpenAI plus live `system_messages` replacement.
-- **Custom:** an authenticated OpenAI-compatible callback that injects the same current permission context before forwarding one model request.
+The Managed path was selected under a cost and setup constraint, not by completing the originally planned Managed-versus-Custom live matrix. One successful Managed conversation established that the Agora voice session and authenticated MCP ingress can connect. Offline tests cover local context, tool, capability, and route-isolation behavior. Those facts do not constitute a comparative benchmark.
 
-The comparison uses one real model, the same STT and TTS pipeline, the same prompt and generation settings, identical MCP tools, and the versioned scenario corpus in [`corpus.json`](./corpus.json). It validates the Voice LLM seam only. It does not run ACP, Codex, a durable Task Runtime, or production Work storage.
+Raw evidence is written under `validation/results/` and remains local because it can contain voice transcripts. The removed Custom LLM callback remains a future architecture alternative, not a supported v0.1 runtime path.
 
-Raw evidence and rendered reports are written under `validation/results/` and remain local because they can contain voice transcripts. Only anonymized aggregate evidence belongs in the architecture decision record.
+## Cost and authorization
 
-## Safety rule
+Every live run starts Agora voice conversations and consumes project minutes. Do not run `validate:managed`, start a browser conversation, or invoke the Agora agent lifecycle merely to verify code. Use the offline test commands for ordinary development. Run this harness only when a person has explicitly authorized the expected live usage.
 
-A candidate is disqualified by any cross-session permission leak, uncorrelated permission resolution, Work creation while a permission is pending, or other forbidden tool call in a safety-critical scenario. The validation must select one path and remove the losing runtime adapter before product implementation begins.
+## Offline verification
 
-## Run the live matrix
+From the repository root:
 
-The validation is certified only on Apple Silicon macOS. Complete the ordinary quickstart setup first:
+```bash
+bun run verify:backend
+```
+
+This compiles the Python sources and runs the architecture-evidence tests without contacting Agora.
+
+## Optional live evidence run
+
+The harness is certified only on Apple Silicon macOS. Complete the ordinary quickstart setup first:
 
 ```bash
 bun run setup
@@ -29,37 +36,26 @@ Add these non-secret values to `server/.env.local`:
 ```dotenv
 VALIDATION_MODEL=gpt-4o-mini
 PUBLIC_VALIDATION_BASE_URL=https://your-current-tunnel.example
-MODEL_PROVIDER_BASE_URL=https://api.openai.com/v1
 ```
 
-For the Custom run only, enter `MODEL_PROVIDER_API_KEY` directly in `server/.env.local`. Never paste it into chat, logs, or evidence.
-
-Expose only the public validation listener:
+Expose only the public evidence listener:
 
 ```bash
 ngrok http 8001
 ```
 
-Before live speech, verify the tunnel returns `404` for `/get_config`, `/startAgent`, `/stopAgent`, and `/validation/admin/permissions`; `/mcp/` without a bearer must return `401`. During Managed validation, `/llm/chat/completions` must return `404`; during Custom validation it must return `401` without its separate callback capability.
+Before live speech, verify that the tunnel returns `404` for `/get_config`, `/startAgent`, `/stopAgent`, `/validation/admin/permissions`, and `/llm/chat/completions`. `/mcp/` without a bearer must return `401`.
 
-Use two local terminals. The runner starts the loopback and public Python listeners; the frontend remains the unchanged quickstart process:
+Use two local terminals:
 
 ```bash
-# Terminal 1
+# Terminal 1: starts the loopback and public Python listeners
 bun run validate:managed
 
-# Terminal 2
+# Terminal 2: starts the unchanged quickstart frontend
 bun run dev:frontend
 ```
 
-Complete the prompted trials, including the explicit reconnect and speech-interruption actions, then repeat with `bun run validate:custom`. A reconnect trial is accepted only after the browser creates a new Agora agent session; the harness rebinds the same synthetic pending permission to that session before the reply. The runner resumes completed trial IDs and never overwrites evidence. An invalidated setup attempt requires a reason, remains in raw evidence, and is rerun. After both paths finish:
+The runner resumes completed trial IDs and never overwrites evidence. A reconnect trial is accepted only after the browser creates a new Agora agent session; the harness rebinds the same synthetic pending permission to that session. Invalidated operator or setup attempts require a reason, remain in raw evidence, and are rerun.
 
-```bash
-bun run validate:report
-```
-
-Before the full matrix, run `bun run validate:managed:smoke` and `bun run validate:custom:smoke`. Smoke mode runs every scenario once; those `:1` trial IDs are retained and count toward the later full matrix. If the browser ends a voice conversation between trials, the runner waits for a new conversation and resumes with its new per-session capabilities instead of discarding completed evidence.
-
-Raw JSONL and rendered reports remain under `validation/results/` and are gitignored. Stop the frontend, runner, and ngrok when finished. The validation harness is not a production runtime.
-
-The report remains inconclusive until each path has at least three scored runs of every ordinary scenario and ten scored runs of every safety-critical scenario. A partial matrix can never select a winner.
+For a bounded setup check, `bun run validate:managed:smoke` runs each scenario once. It still consumes live Agora minutes. Stop the frontend, runner, and ngrok when finished.

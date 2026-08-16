@@ -1,4 +1,4 @@
-"""Shared MCP tool behavior for both Voice LLM candidates."""
+"""Synthetic MCP tool behavior for Managed Voice LLM evidence."""
 
 from datetime import datetime, timezone
 from typing import Optional

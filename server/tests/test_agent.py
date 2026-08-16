@@ -27,6 +27,16 @@ def test_agent_constructs_with_full_env(fake_env):
     assert instance.client is not None
 
 
+def test_default_agent_needs_no_evidence_configuration(fake_env, monkeypatch):
+    for name in ("VALIDATION_MODEL", "PUBLIC_VALIDATION_BASE_URL"):
+        monkeypatch.delenv(name, raising=False)
+
+    agent = _fresh_agent_module()
+    instance = agent.Agent()
+
+    assert instance.evidence_config is None
+
+
 def test_start_wires_managed_openai_and_returns_shape(fake_env, monkeypatch):
     agent = _fresh_agent_module()
     captured = {}
@@ -48,6 +58,15 @@ def test_start_wires_managed_openai_and_returns_shape(fake_env, monkeypatch):
 
     monkeypatch.setattr(AgoraAgent, "create_async_session", fake_create_async_session)
 
+    def fail_if_evidence_capability_is_issued(**_kwargs):
+        raise AssertionError("default sessions must not issue evidence capabilities")
+
+    monkeypatch.setattr(
+        agent.capability_registry,
+        "issue_sync",
+        fail_if_evidence_capability_is_issued,
+    )
+
     instance = agent.Agent()
     result = asyncio.run(instance.start(channel_name="ch", agent_uid=111, user_uid=222))
 
@@ -56,7 +75,7 @@ def test_start_wires_managed_openai_and_returns_shape(fake_env, monkeypatch):
         "channel_name": "ch",
         "status": "started",
     }
-    # The LLM stage is the managed OpenAI vendor (gpt-4o-mini), NOT CustomLLM.
+    # The LLM stage is the managed OpenAI vendor (gpt-4o-mini).
     assert captured["llm"]["url"] == "https://api.openai.com/v1/chat/completions"
     assert captured["llm"]["params"]["model"] == "gpt-4o-mini"
     assert captured["llm"]["style"] == "openai"

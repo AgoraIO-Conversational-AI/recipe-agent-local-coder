@@ -7,11 +7,8 @@ from architecture_validation.config import ValidationConfig
 
 def values(**overrides):
     result = {
-        "VOICE_LLM_PATH": "managed",
         "VALIDATION_MODEL": "gpt-4o-mini",
         "PUBLIC_VALIDATION_BASE_URL": "https://example.ngrok.app",
-        "MODEL_PROVIDER_BASE_URL": "https://api.openai.com/v1",
-        "MODEL_PROVIDER_API_KEY": "",
     }
     result.update(overrides)
     return result
@@ -20,7 +17,6 @@ def values(**overrides):
 def test_managed_config_uses_corpus_controls_without_provider_key():
     config = ValidationConfig.from_mapping(values())
 
-    assert config.path == "managed"
     assert config.model == "gpt-4o-mini"
     assert config.temperature == 0.0
     assert config.top_p == 1.0
@@ -28,15 +24,12 @@ def test_managed_config_uses_corpus_controls_without_provider_key():
     assert config.max_history == 15
 
 
-def test_custom_config_requires_real_provider_key():
-    with pytest.raises(ValueError, match="MODEL_PROVIDER_API_KEY"):
-        ValidationConfig.from_mapping(values(VOICE_LLM_PATH="custom"))
+def test_selected_baseline_has_no_runtime_path_or_provider_configuration():
+    config = ValidationConfig.from_mapping(values())
 
-
-@pytest.mark.parametrize("path", ["", "other", "MANAGED"])
-def test_path_is_exact(path):
-    with pytest.raises(ValueError, match="VOICE_LLM_PATH"):
-        ValidationConfig.from_mapping(values(VOICE_LLM_PATH=path))
+    assert not hasattr(config, "path")
+    assert not hasattr(config, "provider_base_url")
+    assert not hasattr(config, "provider_api_key")
 
 
 @pytest.mark.parametrize(

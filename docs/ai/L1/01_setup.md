@@ -57,7 +57,7 @@ AGENT_BACKEND_URL=http://localhost:8000
 | `AGENT_BACKEND_URL`      | Next build (web)     | Yes for rewrites | Empty/missing → no `/api/*` rewrites registered. Required by `web/scripts/doctor.ts`. |
 | `NEXT_PUBLIC_AGENT_UID`  | Browser (web)        | No       | Optional UID override read in `ConversationComponent.tsx`.            |
 
-Architecture validation additionally uses `VOICE_LLM_PATH`, one real model-provider key for the Custom candidate, `VALIDATION_MODEL`, and `PUBLIC_VALIDATION_BASE_URL`. The Managed candidate calls `update` and `say` through the authenticated Agent session and needs no separate REST credentials. The runner creates MCP and LLM callback capabilities in memory; do not add static capability tokens to `.env.local`.
+The optional Managed-path evidence harness additionally uses `VALIDATION_MODEL` and `PUBLIC_VALIDATION_BASE_URL`. It calls `update` and `say` through the authenticated Agent session and needs no separate model-provider credentials. The runner creates MCP capabilities in memory; do not add static capability tokens to `.env.local`.
 
 ## Python Dependencies
 
@@ -90,9 +90,7 @@ bun run verify:web:api         # web/scripts/verify-api-contracts.ts
 bun run verify:web:proxy       # web/scripts/verify-local-proxy.ts
 bun run verify:local:fastapi   # spawns server/scripts/run_fake_server.py
 bun run clean                  # remove backend venv, node_modules, .next, web/dist
-bun run validate:managed       # interactive Managed live matrix
-bun run validate:custom        # interactive Custom live matrix
-bun run validate:report        # local redacted decision report
+bun run validate:managed       # optional interactive Managed evidence run; uses live Agora minutes
 ```
 
 `cd web && bun run doctor` separately enforces `AGENT_BACKEND_URL` validity.

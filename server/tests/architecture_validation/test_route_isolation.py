@@ -4,7 +4,6 @@ from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
 from architecture_validation.admin import build_admin_router
-from architecture_validation.custom_llm import CustomLlmProxyConfig
 from architecture_validation.public_server import create_public_app
 from architecture_validation.state import CapabilityRegistry, ValidationStateStore
 
@@ -12,7 +11,7 @@ from architecture_validation.state import CapabilityRegistry, ValidationStateSto
 def test_public_surface_rejects_missing_or_invalid_mcp_bearer():
     store = ValidationStateStore()
     registry = CapabilityRegistry()
-    app = create_public_app(store=store, registry=registry, include_custom_llm=False)
+    app = create_public_app(store=store, registry=registry)
 
     with TestClient(app) as client:
         missing = client.post("/mcp", json={})
@@ -30,7 +29,7 @@ def test_public_surface_accepts_registered_capability_before_protocol_validation
     binding = registry.issue_sync(
         session_id="session-a", scenario_id="scenario-a", ttl_seconds=60
     )
-    app = create_public_app(store=store, registry=registry, include_custom_llm=False)
+    app = create_public_app(store=store, registry=registry)
 
     with TestClient(app) as client:
         response = client.post(
@@ -54,7 +53,6 @@ def test_public_surface_accepts_only_configured_tunnel_host():
     app = create_public_app(
         store=store,
         registry=registry,
-        include_custom_llm=False,
         public_host="voice.example.test",
     )
     headers = {"Authorization": f"Bearer {binding.mcp_bearer}"}
@@ -80,7 +78,6 @@ def test_public_surface_has_no_loopback_or_lifecycle_routes():
     app = create_public_app(
         store=ValidationStateStore(),
         registry=CapabilityRegistry(),
-        include_custom_llm=False,
     )
 
     with TestClient(app) as client:
@@ -109,23 +106,3 @@ def test_admin_seed_route_rejects_non_loopback_client():
         )
 
     assert response.status_code == 403
-
-
-def test_custom_route_is_mounted_only_when_explicitly_configured():
-    store = ValidationStateStore()
-    registry = CapabilityRegistry()
-    custom_app = create_public_app(
-        store=store,
-        registry=registry,
-        include_custom_llm=True,
-        custom_llm_config=CustomLlmProxyConfig(
-            provider_base_url="https://provider.example/v1",
-            provider_api_key="provider-secret",
-            model="gpt-4o-mini",
-        ),
-    )
-
-    with TestClient(custom_app) as client:
-        response = client.post("/llm/chat/completions", json={})
-
-    assert response.status_code == 401

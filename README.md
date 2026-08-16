@@ -6,7 +6,7 @@
 
 Build a production-style voice agent with a Next.js web client and Python FastAPI backend. This quickstart includes live transcript, agent visualizer ([Agent UIKit](https://agoraio-conversational-ai.github.io/agent-uikit/)), and managed STT/LLM/TTS defaults.
 
-> This derivative is currently running a bounded Voice LLM architecture validation. Validation code is isolated under `server/src/architecture_validation/` and does not execute ACP or local coding work. See [`validation/README.md`](validation/README.md).
+> This derivative uses Agora's Managed Voice LLM path. Its isolated evidence harness under `server/src/architecture_validation/` exercises synthetic MCP and permission behavior only; it does not execute ACP or local coding work. See [`validation/README.md`](validation/README.md).
 
 ## Prerequisites
 
@@ -97,9 +97,7 @@ Primary backend env file: [`server/.env.example`](server/.env.example).
 | `PORT` |  | `8000` | FastAPI server port |
 | `AGENT_BACKEND_URL` (web deploy) | ✅ | — | Required in deployed `web` app when proxying to external FastAPI |
 
-Architecture-validation variables are documented in `server/.env.example`. Per-session MCP and Custom LLM callback capabilities are generated at runtime and are never developer-managed environment variables.
-
-`VOICE_LLM_PATH` is required during validation and accepts exactly `managed` or `custom`. Both paths read model and generation controls from `validation/corpus.json`; `VALIDATION_MODEL` must match that corpus. Only the Custom path requires `MODEL_PROVIDER_API_KEY`.
+Architecture-evidence variables are documented in `server/.env.example`. Per-session MCP capabilities are generated at runtime and are never developer-managed environment variables. `VALIDATION_MODEL` must match the controls in `validation/corpus.json`.
 
 > **Default vs BYOK** — this quickstart defaults to Agora-managed STT + LLM + TTS in the backend. Enable BYOK by uncommenting provider blocks in `server/src/agent.py` and adding matching keys.
 

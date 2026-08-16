@@ -26,7 +26,6 @@ class CapabilityRegistry:
     def __init__(self) -> None:
         self._lock = threading.RLock()
         self._mcp: dict[str, RuntimeSessionBinding] = {}
-        self._llm: dict[str, RuntimeSessionBinding] = {}
 
     def issue_sync(
         self, *, session_id: str, scenario_id: str, ttl_seconds: int = 3600
@@ -40,22 +39,16 @@ class CapabilityRegistry:
             session_id=session_id,
             scenario_id=scenario_id,
             mcp_bearer=secrets.token_urlsafe(32),
-            llm_callback_bearer=secrets.token_urlsafe(32),
             expires_at=datetime.now(timezone.utc) + timedelta(seconds=ttl_seconds),
         )
         with self._lock:
             self.expire_session_sync(session_id)
             self._mcp[binding.mcp_bearer] = binding
-            self._llm[binding.llm_callback_bearer] = binding
         return binding
 
     def resolve_mcp_sync(self, bearer: str) -> Optional[RuntimeSessionBinding]:
         with self._lock:
             return self._resolve(self._mcp, bearer)
-
-    def resolve_llm_sync(self, bearer: str) -> Optional[RuntimeSessionBinding]:
-        with self._lock:
-            return self._resolve(self._llm, bearer)
 
     def _resolve(
         self, index: dict[str, RuntimeSessionBinding], bearer: str
@@ -75,11 +68,6 @@ class CapabilityRegistry:
                 for token, binding in self._mcp.items()
                 if binding.session_id != session_id
             }
-            self._llm = {
-                token: binding
-                for token, binding in self._llm.items()
-                if binding.session_id != session_id
-            }
 
     def set_scenario_sync(
         self, session_id: str, scenario_id: str
@@ -97,7 +85,6 @@ class CapabilityRegistry:
                 raise KeyError("active session binding not found")
             updated = replace(binding, scenario_id=scenario_id)
             self._mcp[updated.mcp_bearer] = updated
-            self._llm[updated.llm_callback_bearer] = updated
             return updated
 
 

@@ -59,7 +59,7 @@ There is **no ESLint config file** in `web/` — Biome is the only TS/JS linter.
 
 ## Testing
 
-- Python: `server/tests/architecture_validation/` uses pytest for the temporary comparison harness. `bun run verify:backend` runs that suite after `py_compile`; ordinary backend route coverage still comes from the smoke scripts.
+- Python: `server/tests/architecture_validation/` uses pytest for the Managed-path evidence harness. `bun run verify:backend` runs that suite after `py_compile`; ordinary backend route coverage still comes from the smoke scripts.
 - TS: no Vitest harness. The verification suite has **four layers** (see `docs/ai/L1/L2/verification_scripts.md`): Python compile, contract harness (`verify-api-contracts.ts`), rewrite stub (`verify-local-proxy.ts`), and FakeAgent FastAPI smoke (`verify-local-fastapi.ts`). The `verify:web:build` step rounds them out.
 - Keep architecture-validation Python tests under `server/tests/architecture_validation/` and run them without live Agora or model credentials.
 

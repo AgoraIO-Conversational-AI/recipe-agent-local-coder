@@ -76,13 +76,13 @@ agora project use my-first-voice-agent
 agora project env write .env.local
 ```
 
-**Note**: The service uses Token007 authentication generated from `AGORA_APP_ID` and `AGORA_APP_CERTIFICATE`. This derivative temporarily requires a Voice LLM architecture-validation configuration in addition to those credentials. The shared chain is `DeepgramSTT` (`nova-3`) + the selected validation LLM path + `MiniMaxTTS` (`speech_2_6_turbo` / `English_captivating_female1`).
+**Note**: The service uses Token007 authentication generated from `AGORA_APP_ID` and `AGORA_APP_CERTIFICATE`. The voice chain is managed `DeepgramSTT` (`nova-3`) + `OpenAI` (`gpt-4o-mini`) + `MiniMaxTTS` (`speech_2_6_turbo` / `English_captivating_female1`).
 
 ### Architecture-validation configuration
 
-Set `VOICE_LLM_PATH` to exactly `managed` or `custom`, set `VALIDATION_MODEL` to the model declared in `validation/corpus.json`, and point `PUBLIC_VALIDATION_BASE_URL` at the ngrok origin exposing local port 8001. The Custom path additionally requires `MODEL_PROVIDER_BASE_URL` and `MODEL_PROVIDER_API_KEY`; the Managed path does not require that provider key. Runtime MCP and callback capability tokens are generated in memory and must not be added to the env file.
+Set `VALIDATION_MODEL` to the model declared in `validation/corpus.json` and point `PUBLIC_VALIDATION_BASE_URL` at the ngrok origin exposing local port 8001. Runtime MCP capability tokens are generated in memory and must not be added to the env file.
 
-Run the scored matrix from the repository root with `bun run validate:managed` and `bun run validate:custom`. See [`validation/README.md`](../validation/README.md) for route-isolation checks, operator actions, evidence handling, and report generation. This harness does not run ACP or local coding work.
+Run `bun run validate:managed` only when live Agora usage is explicitly authorized. See [`validation/README.md`](../validation/README.md) for route-isolation checks, operator actions, evidence handling, and cost guidance. This harness does not run ACP or local coding work.
 
 ### 2. Install Dependencies
 
@@ -152,6 +152,5 @@ This project uses `agora-agents` (import `agora_agent`):
 - Package: `agora_agent`
 - Agent builder: `agora_agent.agentkit.Agent` with fluent `.with_llm()` / `.with_tts()` / `.with_stt()` API
 - Default vendors: `DeepgramSTT`, `OpenAI`, `MiniMaxTTS` from `agora_agent.agentkit.vendors`
-- Validation-only alternative: `CustomLLM`, selected only while the bounded comparison is active
 - Optional BYOK examples in `src/agent.py`: `DeepgramSTT`, `OpenAI(api_key=...)`, `ElevenLabsTTS`
 - Token: `agora_agent.agentkit.token.generate_convo_ai_token`

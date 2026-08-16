@@ -1,4 +1,4 @@
-"""Interactive macOS live runner for the Voice LLM comparison."""
+"""Interactive macOS evidence runner for the selected Managed Voice LLM path."""
 
 import argparse
 import asyncio
@@ -19,7 +19,6 @@ from .models import (
     PendingPermission,
     RuntimeSessionBinding,
     ToolObservation,
-    VoiceLlmPath,
 )
 from .public_server import create_public_app_for_config
 from .recorder import EvidenceRecorder
@@ -199,11 +198,7 @@ async def verify_public_route_isolation(
         ("POST", "/validation/admin/permissions", 404),
         ("GET", "/validation/results", 404),
         ("GET", "/mcp/", 401),
-        (
-            "POST",
-            "/llm/chat/completions",
-            401 if config.path == "custom" else 404,
-        ),
+        ("POST", "/llm/chat/completions", 404),
     ]
     observations = []
     async with httpx.AsyncClient(timeout=10, follow_redirects=False) as client:
@@ -250,15 +245,16 @@ async def verify_public_route_isolation(
     return observations
 
 
-async def run_live(path: VoiceLlmPath, *, smoke: bool = False) -> int:
+async def run_live(*, smoke: bool = False) -> int:
     load_dotenv(Path(__file__).parents[2] / ".env.local", override=False)
     config = ValidationConfig.from_env()
-    if config.path != path:
-        raise ValueError(f"VOICE_LLM_PATH is {config.path}, expected {path}")
     if platform.system() != "Darwin" or platform.machine() != "arm64":
         raise RuntimeError("Architecture validation is certified only on Apple Silicon macOS")
 
     import server as loopback_server
+    from agent import Agent
+
+    loopback_server.agent = Agent(evidence_config=config)
 
     public_app = create_public_app_for_config(config)
     servers = [
@@ -302,22 +298,23 @@ async def run_live(path: VoiceLlmPath, *, smoke: bool = False) -> int:
         )
 
         corpus = json.loads(CORPUS_PATH.read_text(encoding="utf-8"))
-        recorder = EvidenceRecorder(RESULTS_DIR / f"{path}.jsonl")
+        recorder = EvidenceRecorder(RESULTS_DIR / "managed.jsonl")
         completed = recorder.completed_trial_ids()
         for scenario in corpus["scenarios"]:
             repetitions = scenario_repetitions(scenario, smoke=smoke)
             for repetition in range(1, repetitions + 1):
-                trial_id = f"{path}:{scenario['id']}:{repetition}"
+                # Preserve the namespace used by existing paid live evidence so
+                # resumed runs never repeat an already completed conversation.
+                trial_id = f"managed:{scenario['id']}:{repetition}"
                 if trial_id in completed:
                     continue
                 while True:
                     active = await wait_for_active_session(loopback_server)
                     active_agent_id, binding, managed_session = active
                     pending = await prepare_scenario(scenario, binding)
-                    if path == "managed":
-                        await managed_synchronizer.on_permission_changed(
-                            session_id=binding.session_id, session=managed_session
-                        )
+                    await managed_synchronizer.on_permission_changed(
+                        session_id=binding.session_id, session=managed_session
+                    )
                     if pending is not None:
                         await managed_synchronizer.announce_permission(
                             session=managed_session, pending=pending
@@ -346,11 +343,10 @@ async def run_live(path: VoiceLlmPath, *, smoke: bool = False) -> int:
                                 pending = await state_store.current_permission(
                                     binding.session_id
                                 )
-                                if path == "managed":
-                                    await managed_synchronizer.on_permission_changed(
-                                        session_id=binding.session_id,
-                                        session=managed_session,
-                                    )
+                                await managed_synchronizer.on_permission_changed(
+                                    session_id=binding.session_id,
+                                    session=managed_session,
+                                )
                                 if pending is not None:
                                     await managed_synchronizer.announce_permission(
                                         session=managed_session, pending=pending
@@ -422,7 +418,6 @@ async def run_live(path: VoiceLlmPath, *, smoke: bool = False) -> int:
                     recorder.append(
                         {
                             "trial_id": recorded_trial_id,
-                            "path": path,
                             "scenario_id": scenario["id"],
                             "corpus_version": corpus["schema_version"],
                             "model_control": corpus["model_control"],
@@ -435,7 +430,6 @@ async def run_live(path: VoiceLlmPath, *, smoke: bool = False) -> int:
                                 json.dumps(
                                     {
                                         "model_control": corpus["model_control"],
-                                        "path": path,
                                         "public_base_url_host": httpx.URL(
                                             config.public_base_url
                                         ).host,
@@ -457,13 +451,11 @@ async def run_live(path: VoiceLlmPath, *, smoke: bool = False) -> int:
                             ),
                             "route_isolation": route_observations,
                             "upstream_quickstart_commit": "2c95b9f5cf1e2b369f6ffe64a111ce8c31ef34e0",
-                            "custom_recipe_reference_commit": "3ae43f2ca294e83b0afad895d859abaf7cd9d631",
                             "safety_critical": scenario["safety_critical"],
                             "passed": passed,
                             "manual_behavior_passed": behavior,
                             "first_response_ms": first_response_ms,
                             "terminal_latency_ms": terminal_latency_ms,
-                            "configuration_steps": 3 if path == "managed" else 4,
                             "invalidated": invalidated,
                             "invalidation_reason": invalidation_reason,
                             "operator_actions": operator_actions,
@@ -486,8 +478,7 @@ async def run_live(path: VoiceLlmPath, *, smoke: bool = False) -> int:
             if recorder is not None:
                 recorder.append(
                     {
-                        "trial_id": f"{path}:cleanup:{time.time_ns()}",
-                        "path": path,
+                        "trial_id": f"managed:cleanup:{time.time_ns()}",
                         "scenario_id": "cleanup",
                         "invalidated": True,
                         "invalidation_reason": "agent stop failed",
@@ -505,10 +496,9 @@ async def run_live(path: VoiceLlmPath, *, smoke: bool = False) -> int:
 
 def main() -> int:
     parser = argparse.ArgumentParser()
-    parser.add_argument("--path", choices=("managed", "custom"), required=True)
     parser.add_argument("--smoke", action="store_true")
     args = parser.parse_args()
-    return asyncio.run(run_live(args.path, smoke=args.smoke))
+    return asyncio.run(run_live(smoke=args.smoke))
 
 
 if __name__ == "__main__":
