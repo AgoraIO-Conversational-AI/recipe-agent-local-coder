@@ -1,6 +1,7 @@
 """Public validation ingress containing only authenticated callback routes."""
 
 from contextlib import asynccontextmanager
+from urllib.parse import urlparse
 
 from fastapi import FastAPI
 
@@ -17,8 +18,9 @@ def create_public_app(
     registry: CapabilityRegistry,
     include_custom_llm: bool,
     custom_llm_config: CustomLlmProxyConfig | None = None,
+    public_host: str | None = None,
 ) -> FastAPI:
-    mcp = create_mcp_server(store)
+    mcp = create_mcp_server(store, public_host=public_host)
     mcp_asgi = McpBearerAuthMiddleware(mcp.streamable_http_app(), registry)
 
     @asynccontextmanager
@@ -61,6 +63,7 @@ def create_public_app_for_config(config: ValidationConfig) -> FastAPI:
         registry=capability_registry,
         include_custom_llm=config.path == "custom",
         custom_llm_config=custom_config,
+        public_host=urlparse(config.public_base_url).hostname,
     )
 
 

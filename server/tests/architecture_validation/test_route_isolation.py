@@ -42,6 +42,40 @@ def test_public_surface_accepts_registered_capability_before_protocol_validation
     assert response.status_code != 401
 
 
+def test_public_surface_accepts_only_configured_tunnel_host():
+    store = ValidationStateStore()
+    registry = CapabilityRegistry()
+    binding = registry.issue_sync(
+        session_id="session-a", scenario_id="scenario-a", ttl_seconds=60
+    )
+    rejected_binding = registry.issue_sync(
+        session_id="session-b", scenario_id="scenario-a", ttl_seconds=60
+    )
+    app = create_public_app(
+        store=store,
+        registry=registry,
+        include_custom_llm=False,
+        public_host="voice.example.test",
+    )
+    headers = {"Authorization": f"Bearer {binding.mcp_bearer}"}
+
+    with TestClient(app) as client:
+        allowed = client.post(
+            "/mcp/", headers={**headers, "Host": "voice.example.test"}, json={}
+        )
+        rejected = client.post(
+            "/mcp/",
+            headers={
+                "Authorization": f"Bearer {rejected_binding.mcp_bearer}",
+                "Host": "attacker.example",
+            },
+            json={},
+        )
+
+    assert allowed.status_code != 421
+    assert rejected.status_code == 421
+
+
 def test_public_surface_has_no_loopback_or_lifecycle_routes():
     app = create_public_app(
         store=ValidationStateStore(),

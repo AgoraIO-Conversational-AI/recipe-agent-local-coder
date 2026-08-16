@@ -195,6 +195,30 @@ async def verify_public_route_isolation(
                     "passed": response.status_code == expected_status,
                 }
             )
+        probe_binding = capability_registry.issue_sync(
+            session_id="route-isolation-probe",
+            scenario_id="route-isolation-probe",
+            ttl_seconds=60,
+        )
+        try:
+            response = await client.post(
+                f"{config.public_base_url}/mcp/",
+                headers={
+                    "Authorization": f"Bearer {probe_binding.mcp_bearer}"
+                },
+                json={},
+            )
+            observations.append(
+                {
+                    "method": "POST",
+                    "route": "/mcp/",
+                    "status": response.status_code,
+                    "expected_status": "authenticated request is not 401 or 421",
+                    "passed": response.status_code not in {401, 421},
+                }
+            )
+        finally:
+            capability_registry.expire_session_sync(probe_binding.session_id)
     failed = [item for item in observations if not item["passed"]]
     if failed:
         raise RuntimeError(f"public route isolation failed: {failed}")

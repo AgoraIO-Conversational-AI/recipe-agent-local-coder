@@ -4,6 +4,7 @@ from contextvars import ContextVar
 from typing import Optional
 
 from mcp.server.fastmcp import FastMCP
+from mcp.server.transport_security import TransportSecuritySettings
 
 from .models import PermissionDecision, RuntimeSessionBinding
 from .state import CapabilityRegistry, ValidationStateStore
@@ -68,8 +69,19 @@ class McpBearerAuthMiddleware:
             _current_binding.reset(token)
 
 
-def create_mcp_server(store: ValidationStateStore) -> FastMCP:
+def create_mcp_server(
+    store: ValidationStateStore, public_host: str | None = None
+) -> FastMCP:
     tools = ValidationTools(store)
+    allowed_hosts = ["127.0.0.1:*", "localhost:*", "[::1]:*", "testserver"]
+    allowed_origins = [
+        "http://127.0.0.1:*",
+        "http://localhost:*",
+        "http://[::1]:*",
+    ]
+    if public_host is not None:
+        allowed_hosts.append(public_host)
+        allowed_origins.append(f"https://{public_host}")
     mcp = FastMCP(
         "recipe-agent-acp-local-validation",
         instructions="Validation-only tools. No ACP or local code execution occurs.",
@@ -77,6 +89,11 @@ def create_mcp_server(store: ValidationStateStore) -> FastMCP:
         stateless_http=True,
         json_response=True,
         max_request_body_size=64 * 1024,
+        transport_security=TransportSecuritySettings(
+            enable_dns_rebinding_protection=True,
+            allowed_hosts=allowed_hosts,
+            allowed_origins=allowed_origins,
+        ),
     )
 
     @mcp.tool()
