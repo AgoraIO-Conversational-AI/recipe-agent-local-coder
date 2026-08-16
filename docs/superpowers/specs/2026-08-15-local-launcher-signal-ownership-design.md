@@ -55,7 +55,9 @@ Terminal -> Local Launcher Supervisor -> concurrently -> backend + frontend
   The supervisor maps HUP to SIGTERM at the `concurrently` root because
   `concurrently` forwards its received root signal to both children, while the
   supervisor still reports the conventional HUP exit status `129`.
-- A second SIGINT while graceful shutdown is in progress skips the remaining
+- Duplicate SIGINT delivery within one 0.5-second terminal burst is coalesced
+  because `bun run` can forward the same user gesture after direct process-group
+  delivery. A deliberate second SIGINT after that window skips the remaining
   wait and sends SIGKILL to the isolated process group.
 - The supervisor waits for the group to exit and does not leave backend,
   frontend, or ACP descendants running.
@@ -110,8 +112,8 @@ that:
 3. asserts both fake siblings exit;
 4. asserts the supervisor signals only the `concurrently` root during graceful
    shutdown and sibling shutdown delivery is not duplicated; and
-5. asserts a second SIGINT and the 10-second deadline can each force cleanup;
-   and
+5. asserts a duplicate SIGINT burst stays graceful, while a deliberate second
+   SIGINT and the 10-second deadline can each force cleanup; and
 6. asserts SIGHUP also removes both siblings; and
 7. asserts launcher output contains no traceback.
 

@@ -39,6 +39,10 @@ The sections below (Start Here, Patterns, Anti-Patterns, etc.) remain the canoni
 
 - Run `bun run dev:codex` for the loopback-only local runtime. It starts FastAPI
   on `127.0.0.1:8000` and Next on `127.0.0.1:3000`, with sibling cleanup.
+- Its Local Launcher Supervisor receives terminal signals once, keeps
+  `concurrently` responsible for sibling lifecycle and labeled output, and
+  force-cleans the isolated process group after a deliberate second Ctrl-C or
+  10 seconds. SIGHUP also cleans descendants when the terminal closes.
 - Its preflight requires macOS Apple Silicon, Bun/Node/Python, and usable Agora
   credentials without printing their values.
 - The browser automatically opens the Project Folder Settings gate until an

@@ -10,7 +10,7 @@
 | Web → Rewrite contract   | `web/scripts/verify-api-contracts.ts`        | `bun run verify:web:api`  | No `app/api` routes; `/api/*` rewrites + fetch shapes correct |
 | Web → rewrite stub       | `web/scripts/verify-local-proxy.ts`          | `bun run verify:web:proxy`| Imports `next.config.ts`, resolves rewrites, fetches an in-process stub directly |
 | Web → FastAPI + FakeAgent| `web/scripts/verify-local-fastapi.ts`        | `bun run verify:local:fastapi` | Spawns FastAPI with `FakeAgent` patched in              |
-| Local launcher           | `scripts/verify-local-launcher.ts`           | `bun run verify:launcher` | Harmless child stubs prove sibling cleanup on failure, SIGINT, and SIGTERM |
+| Local launcher           | `scripts/verify-local-launcher.ts`           | `bun run verify:launcher` | Harmless child stubs prove single signal ownership, escalation, and residual cleanup |
 | Local preflight          | `scripts/local-codex-preflight.test.ts`      | `bun test scripts/local-codex-preflight.test.ts` | Certified platform/runtime/config rules without live services |
 
 `bun run verify` is the production-bound chain (`doctor` → `verify:web:api` → `verify:web:build`). `bun run verify:local` is the dev-bound chain (`doctor:local` → `verify:backend` → `verify:local:fastapi` → `verify:web:proxy` → `verify:web:build`).
@@ -102,16 +102,22 @@ ACP, or any network endpoint.
 
 What it does:
 
-1. Checks that `dev:codex` delegates to `scripts/run-local-codex.sh` and that
-   the launcher has the expected cleanup trap and sibling-kill behavior.
+1. Checks that `dev:codex` delegates to `scripts/run-local-codex.sh`, which
+   replaces itself with `scripts/supervise-local.py` after parsing arguments.
 2. Starts the launcher only with injected harmless shell stubs through
    `LOCAL_BACKEND_COMMAND` and `LOCAL_FRONTEND_COMMAND`.
 3. Proves a failing child returns failure and terminates its sibling.
-4. Proves SIGINT and SIGTERM terminate both stub child processes.
-5. Proves `--workspace` and JSON-argv custom-command values reach children as
+4. Proves terminal SIGINT, SIGTERM, and SIGHUP reach each child exactly once
+   with the stable `130`, `143`, and `129` launcher statuses.
+5. Proves one duplicate SIGINT burst stays graceful, while a later deliberate
+   Ctrl-C or a shortened test deadline returns `137` and removes
+   signal-ignoring children. Normal root completion removes residual
+   descendants.
+6. Proves `--workspace` and JSON-argv custom-command values reach children as
    opaque environment values, and unknown arguments fail closed.
 
-The injection variables are test seams, not normal end-user command overrides.
+The injection variables and `LOCAL_LAUNCHER_GRACE_SECONDS` are test seams, not
+normal end-user command overrides.
 This check does not launch the real `dev:codex` services, Codex, browser auth,
 Agora, ngrok, or the native picker.
 

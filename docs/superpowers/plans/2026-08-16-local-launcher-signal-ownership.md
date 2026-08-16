@@ -13,7 +13,8 @@
 - Preserve `bun run dev:codex`, `--workspace`, `--acp-command-json`, `LOCAL_BACKEND_COMMAND`, and `LOCAL_FRONTEND_COMMAND` contracts.
 - Keep `concurrently` responsible for labeled output, fail-fast behavior, and sibling shutdown.
 - The first SIGINT or SIGTERM is delivered only to the `concurrently` root; SIGHUP maps to root SIGTERM.
-- A second SIGINT or a 10-second deadline sends SIGKILL to the isolated group.
+- Duplicate SIGINT delivery within 0.5 seconds is coalesced; a later second
+  SIGINT or a 10-second deadline sends SIGKILL to the isolated group.
 - Return `130` for SIGINT, `143` for SIGTERM, `129` for SIGHUP, and `137` for forced cleanup.
 - Remove residual descendants after the root exits, including an open native picker, without picker-specific logic.
 - Use no new runtime dependency and do not start Agora, RTC/RTM, ngrok, or a conversation during verification.
@@ -132,7 +133,7 @@ def main(argv: list[str] | None = None) -> int:
 
 2. install SIGHUP, SIGINT, and SIGTERM handlers on the supervisor;
 3. on the first signal, call `root.send_signal(signal.SIGTERM if received == signal.SIGHUP else received)` exactly once and start the deadline;
-4. on a second SIGINT or expired deadline, call `os.killpg(root.pid, signal.SIGKILL)` and remember forced cleanup;
+4. coalesce SIGINT signals received within 0.5 seconds, then on a later second SIGINT or expired deadline call `os.killpg(root.pid, signal.SIGKILL)` and remember forced cleanup;
 5. after `root.wait()`, probe `os.killpg(root.pid, 0)` and, if descendants remain, send group SIGTERM, wait up to `RESIDUAL_GRACE_SECONDS`, then send group SIGKILL;
 6. return the accepted signal exit code, `137` for forced cleanup, or the root status when no terminal signal was received; and
 7. catch a missing `concurrently` executable, print `Could not start the local process supervisor: concurrently was not found` to stderr, and return `127` without a traceback.
@@ -161,6 +162,8 @@ Extend `scripts/verify-local-launcher.ts` to cover:
 - SIGINT returns `130` and each child records one SIGINT;
 - SIGTERM returns `143` and each child records one SIGTERM;
 - SIGHUP returns `129` while each child records one SIGTERM;
+- duplicate SIGINT delivery 50 milliseconds apart stays graceful and returns
+  `130`;
 - a second SIGINT forces the isolated group and returns `137`;
 - a `0.25` second deadline forces signal-ignoring stubs and returns `137`;
 - an orphan descendant in the isolated group is gone after root completion;

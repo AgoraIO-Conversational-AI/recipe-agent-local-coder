@@ -67,6 +67,14 @@ normal dependency checks first, verifies macOS Apple Silicon, Bun/Node/Python,
 and usable Agora credentials without printing their values, then supervises
 both processes so either child stopping also stops its sibling.
 
+The Local Launcher Supervisor owns terminal signals once. The first Ctrl-C
+gracefully stops both services; a deliberate second Ctrl-C or the 10-second
+shutdown deadline forces cleanup of the isolated local process group. Closing
+the terminal follows the same cleanup path, so backend, frontend, ACP, and
+picker descendants do not remain in the background. Interrupted exits use
+`130` for SIGINT, `143` for SIGTERM, `129` for SIGHUP, and `137` after forced
+cleanup.
+
 ```bash
 bun run dev:codex
 ```
@@ -186,6 +194,11 @@ do not execute the pinned `npx` command, authenticate in a browser, open the
 native picker, start an Agora conversation, or open ngrok. Those are live/manual
 checks. Tests run standalone: `pytest` in `server/`, `bun test` in `web/`. CI
 runs them on Linux/macOS/Windows × Python 3.10 & 3.13.
+
+`bun run verify:launcher` uses harmless child stubs to exercise terminal signal
+ownership, forced cleanup, and residual descendants. It does not start Agora or
+consume conversation minutes. `LOCAL_LAUNCHER_GRACE_SECONDS` is only a private
+verification seam for shortening its deadline, not an end-user setting.
 
 ## Architecture
 
