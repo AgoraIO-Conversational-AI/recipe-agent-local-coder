@@ -29,6 +29,21 @@ function mockFetch(status: number, body: unknown) {
   }) as typeof fetch
 }
 
+function mockFetchSequence(responses: Array<{ status: number; body: unknown; contentType?: string }>) {
+  const calls: Array<{ url: string; init?: RequestInit }> = []
+  globalThis.fetch = (async (url: string | URL, init?: RequestInit) => {
+    calls.push({ url: String(url), init })
+    const next = responses.shift()
+    if (!next) throw new Error('Unexpected fetch call')
+    const body = typeof next.body === 'string' ? next.body : JSON.stringify(next.body)
+    return new Response(body, {
+      status: next.status,
+      headers: { 'content-type': next.contentType ?? 'application/json' },
+    })
+  }) as typeof fetch
+  return calls
+}
+
 test('getConfig hits /api/get_config with query and returns data', async () => {
   mockFetch(200, {
     code: 0,
@@ -117,31 +132,80 @@ test('getLocalRuntime returns the local Codex readiness state', async () => {
   expect(lastCall.init?.method).toBe('GET')
 })
 
-test('browseWorkspace posts only to the local browse route', async () => {
-  mockFetch(200, {
-    code: 0,
-    msg: 'success',
-    data: {
-      state: 'ready',
-      profile: {
-        id: 'codex',
-        label: 'Codex',
-        requires_primary_directory: true,
-        supports_additional_directories: false,
-      },
-      workspace: {
-        id: 'workspace-a',
-        label: 'project',
-        primary_directory: '/tmp/project',
+test('browseWorkspace starts once and polls until the picker is ready', async () => {
+  const calls = mockFetchSequence([
+    {
+      status: 202,
+      body: { code: 0, msg: 'success', data: { operation_id: 'browse-1', state: 'picking' } },
+    },
+    {
+      status: 200,
+      body: { code: 0, msg: 'success', data: { operation_id: 'browse-1', state: 'picking' } },
+    },
+    {
+      status: 200,
+      body: {
+        code: 0,
+        msg: 'success',
+        data: {
+          operation_id: 'browse-1',
+          state: 'ready',
+          workspace: {
+            state: 'ready',
+            profile: {
+              id: 'codex',
+              label: 'Codex',
+              requires_primary_directory: true,
+              supports_additional_directories: false,
+            },
+            workspace: {
+              id: 'workspace-a',
+              label: 'project',
+              primary_directory: '/tmp/project',
+            },
+          },
+        },
       },
     },
-  })
+  ])
 
-  await browseWorkspace()
+  const status = await browseWorkspace({ pollIntervalMs: 0 })
 
-  expect(lastCall.url).toContain('/api/local/workspace/browse')
-  expect(lastCall.init?.method).toBe('POST')
-  expect(lastCall.init?.body).toBeUndefined()
+  expect(status.workspace?.primary_directory).toBe('/tmp/project')
+  expect(calls.map((call) => [call.url, call.init?.method])).toEqual([
+    ['/api/local/workspace/browse', 'POST'],
+    ['/api/local/workspace/browse/browse-1', 'GET'],
+    ['/api/local/workspace/browse/browse-1', 'GET'],
+  ])
+})
+
+test('local helpers turn a non-JSON proxy failure into a bounded HTTP error', async () => {
+  mockFetchSequence([{ status: 500, body: 'Internal Server Error', contentType: 'text/plain' }])
+
+  await expect(getWorkspace()).rejects.toThrow('HTTP 500')
+})
+
+test('browseWorkspace reports a cancelled picker without changing Workspace', async () => {
+  mockFetchSequence([
+    {
+      status: 202,
+      body: { code: 0, msg: 'success', data: { operation_id: 'browse-2', state: 'picking' } },
+    },
+    {
+      status: 200,
+      body: {
+        code: 0,
+        msg: 'success',
+        data: {
+          operation_id: 'browse-2',
+          state: 'cancelled',
+          error: 'Project Folder selection was cancelled',
+        },
+      },
+    },
+  ])
+
+  await expect(browseWorkspace({ pollIntervalMs: 0 })).rejects.toThrow('Project Folder selection was cancelled')
 })
 
 test('selectWorkspace sends the advanced manual path', async () => {

@@ -1,4 +1,4 @@
-import type { LocalRuntimeStatus, WorkspaceStatus } from '@/lib/workspace'
+import type { BrowseOperationStatus, LocalRuntimeStatus, WorkspaceStatus } from '@/lib/workspace'
 
 const API_BASE_URL = '/api'
 
@@ -77,12 +77,18 @@ async function readWorkspaceResponse(response: Response): Promise<WorkspaceStatu
 }
 
 async function readLocalResponse<T>(response: Response, fallbackMessage: string): Promise<T> {
-  const result = await response.json()
-  if (!response.ok) {
-    throw new Error(result.detail || `HTTP ${response.status}`)
+  const body = await response.text()
+  let result: { code?: number; msg?: string; detail?: string; data?: T } | null = null
+  try {
+    result = JSON.parse(body)
+  } catch {
+    // Local development proxies can return plain-text transport failures.
   }
-  if (result.code !== 0 || !result.data) {
-    throw new Error(result.msg || fallbackMessage)
+  if (!response.ok) {
+    throw new Error(result?.detail || `HTTP ${response.status}`)
+  }
+  if (result?.code !== 0 || result.data === undefined || result.data === null) {
+    throw new Error(result?.msg || fallbackMessage)
   }
   return result.data
 }
@@ -105,8 +111,57 @@ export async function startLocalRuntime(): Promise<LocalRuntimeStatus> {
   )
 }
 
-export async function browseWorkspace(): Promise<WorkspaceStatus> {
-  return readWorkspaceResponse(await fetch(`${API_BASE_URL}/local/workspace/browse`, { method: 'POST' }))
+export async function browseWorkspace(options?: {
+  pollIntervalMs?: number
+  signal?: AbortSignal
+}): Promise<WorkspaceStatus> {
+  const signal = options?.signal
+  const pollIntervalMs = options?.pollIntervalMs ?? 300
+  const started = await readLocalResponse<BrowseOperationStatus>(
+    await fetch(`${API_BASE_URL}/local/workspace/browse`, {
+      method: 'POST',
+      signal,
+    }),
+    'Could not open the Project Folder picker',
+  )
+
+  let operation = started
+  while (operation.state === 'picking') {
+    await waitForPoll(pollIntervalMs, signal)
+    operation = await readLocalResponse<BrowseOperationStatus>(
+      await fetch(`${API_BASE_URL}/local/workspace/browse/${encodeURIComponent(operation.operation_id)}`, {
+        method: 'GET',
+        signal,
+      }),
+      'Could not read the Project Folder picker status',
+    )
+  }
+
+  if (operation.state === 'ready' && operation.workspace) {
+    return operation.workspace
+  }
+  throw new Error(
+    operation.error ||
+      (operation.state === 'cancelled'
+        ? 'Project Folder selection was cancelled'
+        : 'Could not select the Project Folder'),
+  )
+}
+
+function waitForPoll(milliseconds: number, signal?: AbortSignal): Promise<void> {
+  signal?.throwIfAborted()
+  if (milliseconds <= 0) return Promise.resolve()
+  return new Promise((resolve, reject) => {
+    const timeout = setTimeout(resolve, milliseconds)
+    signal?.addEventListener(
+      'abort',
+      () => {
+        clearTimeout(timeout)
+        reject(signal.reason)
+      },
+      { once: true },
+    )
+  })
 }
 
 export async function selectWorkspace(path: string): Promise<WorkspaceStatus> {

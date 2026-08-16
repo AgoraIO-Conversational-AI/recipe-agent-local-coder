@@ -64,6 +64,10 @@ const nextConfig: NextConfig = {
         destination: `${backendUrl}/local/workspace/browse`,
       },
       {
+        source: '/api/local/workspace/browse/:operationId',
+        destination: `${backendUrl}/local/workspace/browse/:operationId`,
+      },
+      {
         source: '/api/local/runtime',
         destination: `${backendUrl}/local/runtime`,
       },

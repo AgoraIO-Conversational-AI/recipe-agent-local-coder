@@ -19,6 +19,15 @@ export interface WorkspaceStatus {
   workspace: WorkspaceScope | null
 }
 
+export type BrowseOperationState = 'picking' | 'ready' | 'cancelled' | 'failed'
+
+export interface BrowseOperationStatus {
+  operation_id: string
+  state: BrowseOperationState
+  workspace?: WorkspaceStatus | null
+  error?: string | null
+}
+
 export type LocalRuntimeState = 'configuration_required' | 'starting' | 'authentication_required' | 'ready' | 'failed'
 
 export interface LocalRuntimeStatus {
