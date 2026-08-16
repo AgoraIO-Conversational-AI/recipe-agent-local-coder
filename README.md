@@ -59,6 +59,43 @@ Services:
 - Backend: `http://localhost:8000`
 - API docs: `http://localhost:8000/docs`
 
+### Run the local Codex foundation
+
+`bun run dev:codex` starts the loopback-only FastAPI backend on
+`127.0.0.1:8000` and the Next.js app on `127.0.0.1:3000`. It performs the
+normal dependency checks first, then supervises both processes so either child
+stopping also stops its sibling.
+
+```bash
+bun run dev:codex
+```
+
+On first launch, the app opens a blocking **Project Folder** Settings gate.
+Choose an existing folder with the native macOS picker (or use the advanced
+path field). The resolved folder is persisted at
+`~/Library/Application Support/Agora Voice ACP/workspace.json`, unless
+`VOICE_ACP_STATE_DIR` selects a different state directory. A valid saved folder
+allows the backend to start one local ACP session; changing or clearing it
+closes that session first. A failed replacement retains the previous saved
+folder.
+
+Project Folder is ACP session context for resolving work and relative paths. It
+is **not** a filesystem sandbox and does not limit what the child process can
+access. The v0.1 Codex profile supports one primary directory and no additional
+directories.
+
+The default child command is pinned and on-demand:
+
+```text
+npx -y @agentclientprotocol/codex-acp@1.1.7
+```
+
+When ACP advertises the `ChatGPT` authentication method, the local client uses
+that method; no API-key authentication mode is configured by this foundation.
+The current advanced override is backend-only: callers may construct
+`CodexAcpClient(command=CodexCommand(...))` or pass a command argv sequence.
+`CODEX_PATH` is not implemented as an environment override in v0.1.
+
 ## Deploy
 
 Deploy `web` as a Next.js app and `server` as a reachable Python service.
@@ -107,11 +144,13 @@ Architecture-evidence variables are documented in `server/.env.example`. Per-ses
 # Dev
 bun run setup
 bun run dev
+bun run dev:codex
 
 # Quality
 bun run doctor
 bun run doctor:local
 bun run verify:backend
+bun run verify:launcher
 
 # CI / pre-ship
 bun run verify:web
@@ -121,7 +160,11 @@ bun run verify
 
 Run `bun run verify` before shipping web-only changes, and `bun run verify:local` when backend behavior changed.
 
-Tests run standalone (no Agora cloud needed): `pytest` in `server/`, `bun test` in `web/`. CI runs them on Linux/macOS/Windows × Python 3.10 & 3.13.
+Offline checks use fake ACP clients/processes and fake FastAPI/proxy paths; they
+do not execute the pinned `npx` command, authenticate in a browser, open the
+native picker, start an Agora conversation, or open ngrok. Those are live/manual
+checks. Tests run standalone: `pytest` in `server/`, `bun test` in `web/`. CI
+runs them on Linux/macOS/Windows × Python 3.10 & 3.13.
 
 ## Architecture
 
@@ -132,11 +175,16 @@ Tests run standalone (no Agora cloud needed): `pytest` in `server/`, `bun test` 
 
 The browser talks to Next.js `/api/*` routes. In local mode, Next rewrites those routes to FastAPI using `AGENT_BACKEND_URL=http://localhost:8000`; FastAPI owns token generation and agent start/stop logic.
 
+The derivative local-runtime extension adds loopback-only Project Folder and
+readiness routes under `/api/local/*`. It does not change the stable quickstart
+routes or make ACP, Codex, or the Project Folder public browser APIs.
+
 ## What You Get
 
 - Next.js web client (`web/`) with transcript UI and agent visualizer
 - FastAPI backend (`server/`) for token generation and agent lifecycle
 - `/api/get_config`, `/api/startAgent`, and `/api/stopAgent` browser-facing contract
+- A local Codex readiness gate with persisted Project Folder context and one ACP child-process session
 - Managed default pipeline (Deepgram STT, OpenAI LLM, MiniMax TTS)
 
 ## How It Works
@@ -161,6 +209,7 @@ The browser talks to Next.js `/api/*` routes. In local mode, Next rewrites those
 - **Auth errors from backend:** confirm `AGORA_APP_ID` and `AGORA_APP_CERTIFICATE` are set in `server/.env.local`.
 - **Frontend cannot reach backend:** confirm `AGENT_BACKEND_URL=http://localhost:8000` in local frontend scripts.
 - **Unsure who owns `/api/*`:** Next owns browser-facing `/api/*`; FastAPI owns `/get_config`, `/startAgent`, `/stopAgent`.
+- **Project Folder gate is blocked:** choose an existing directory. If the local runtime asks for authentication, complete the advertised ChatGPT sign-in flow and retry. This quickstart does not validate that live flow offline.
 
 ## More Docs
 

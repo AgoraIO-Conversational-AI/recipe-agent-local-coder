@@ -79,6 +79,22 @@ If you need real auth, add a FastAPI dependency that validates a header on each 
 - `server/scripts/run_fake_server.py` accepts the same routes with no validation. Do not deploy it.
 - The web client does not encrypt or sign the browser → Next → FastAPI path beyond TLS at the host level.
 
+## Local Codex Boundary
+
+- `/local/workspace`, `/local/workspace/browse`, and `/local/runtime` call
+  `require_loopback`; they are not public deployment endpoints.
+- The native macOS picker runs in the backend process, so the browser receives
+  only the selected status payload and never direct filesystem-picker access.
+- Project Folder gives ACP a resolved working-directory context. It is not a
+  filesystem sandbox or access-control boundary; do not rely on it for isolation.
+- `CodexAcpClient` does not log ACP JSON-RPC frames, environment values,
+  authentication data, raw reasoning, or private protocol identifiers. Callback
+  storage retains only safe update-kind summaries and bounded permission prompts.
+- Permissions are cancelled by default in the foundation. The Permission Broker
+  and any decision flow are deferred to the Task Runtime plan.
+- The default authentication path is only an ACP-advertised ChatGPT method. No
+  API-key mode and no `CODEX_PATH` environment override are configured.
+
 ## Managed-path evidence boundary
 
 - ngrok maps only the dedicated public ASGI listener, never the lifecycle FastAPI port.

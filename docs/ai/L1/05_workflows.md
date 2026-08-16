@@ -62,6 +62,22 @@ bun run dev
 
 `concurrently` propagates Ctrl-C to both processes. If one crashes, both exit.
 
+## Run the Local Codex Foundation
+
+```bash
+bun run dev:codex
+```
+
+The app loads Project Folder status first. Without a valid saved directory, the
+Settings gate remains open and conversation start is blocked. Select with the
+backend-owned native macOS picker or the advanced manual path; a successful
+selection activates ACP and refreshes readiness. Do not describe the folder as
+a sandbox. A failed replacement restores the previous persisted selection.
+
+Use `GET /api/local/runtime` only to display readiness; it must not start ACP.
+The real `npx` package execution, ChatGPT browser authentication, native picker,
+Agora conversation, and ngrok remain manual/live checks.
+
 ## Token Renewal
 
 The browser receives `token-privilege-will-expire` from RTC and calls `getConfig()` twice — once with the RTC `client.uid`, once with the stored `agoraData.uid`. The Python backend re-issues RTM-capable RTC tokens via `generate_convo_ai_token`. If a request passes `uid=0`, the backend generates a non-zero UID because Agora RTC treats `0` as auto-assign but RTM token subjects cannot use `0`.

@@ -29,6 +29,15 @@ CORS middleware: `allow_origins=["*"]`, `allow_credentials=True`.
 | `/api/startAgent`  | `${AGENT_BACKEND_URL}/startAgent`             |
 | `/api/stopAgent`   | `${AGENT_BACKEND_URL}/stopAgent`              |
 
+The local Codex derivative appends these loopback-only extension rewrites. They
+do not alter the stable quickstart routes above:
+
+| Source | Destination | Method(s) |
+| --- | --- | --- |
+| `/api/local/workspace` | `${AGENT_BACKEND_URL}/local/workspace` | GET, PUT, DELETE |
+| `/api/local/workspace/browse` | `${AGENT_BACKEND_URL}/local/workspace/browse` | POST |
+| `/api/local/runtime` | `${AGENT_BACKEND_URL}/local/runtime` | GET |
+
 `verify-api-contracts.ts` asserts that no `web/app/api/**/route.ts` files exist. Adding one would create a competing handler in front of the rewrite — don't.
 
 ## Environment Variables
@@ -41,6 +50,24 @@ CORS middleware: `allow_origins=["*"]`, `allow_credentials=True`.
 | Browser                | `NEXT_PUBLIC_AGENT_UID` (optional)        |
 
 `AGENT_BACKEND_URL` is a Next **server**-time env var (used inside `next.config.ts`), not a `NEXT_PUBLIC_*` value — do not prefix it.
+
+## Local Workspace and Runtime Contract
+
+Every `/local/*` response uses `{ "code": 0, "msg": "success", "data": ... }`
+and rejects non-loopback callers with `403`.
+
+`WorkspaceStatus` contains `state` (`unconfigured`, `ready`, or `invalid`), a
+Codex `profile`, and an optional workspace `{ id, label, primary_directory }`.
+The profile requires one primary directory and supports no additional directories.
+`PUT` accepts `{ "path": "..." }`; the path must resolve to an existing
+directory. Browse cancellation returns `409`. `LocalRuntimeStatus` uses
+`configuration_required`, `starting`, `authentication_required`, `ready`, or
+`failed`, plus `workspace` and an optional safe `error`.
+
+The default ACP command is pinned to `npx -y @agentclientprotocol/codex-acp@1.1.7`
+with `INITIAL_AGENT_MODE=agent`. If the ACP server advertises `ChatGPT`, the
+client authenticates with that method before `new_session(cwd=<resolved folder>,
+mcp_servers=[])`. No API-key mode or `CODEX_PATH` environment override exists.
 
 ## Token Shape
 

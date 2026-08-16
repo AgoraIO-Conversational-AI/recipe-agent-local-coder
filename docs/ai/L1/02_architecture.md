@@ -87,6 +87,23 @@ Agent parameters: `data_channel="rtm"`, `enable_error_message=True`, `enable_met
 - Next.js rewrites hide backend placement from the browser — `/api/*` is the only URL the client knows.
 - Single repo keeps web and backend changes reviewable together while preserving deploy separation.
 
+## Derivative Local Codex Runtime
+
+The local Codex foundation adds a separate loopback-only path without changing
+the quickstart conversation routes:
+
+```text
+Project Folder Settings gate -> /api/local/* -> /local/* -> WorkspaceService
+  -> LocalRuntimeCoordinator -> CodexAcpClient child process -> ACP session
+```
+
+`WorkspaceService` persists one resolved primary directory. It is ACP context,
+not a filesystem sandbox. `LocalRuntimeCoordinator` returns only safe
+readiness states and serializes one active session; it closes an old session
+before opening a replacement. `CodexAcpClient` uses the pinned `npx` command,
+performs advertised ChatGPT auth when required, and creates a session with
+`mcp_servers=[]`. Offline tests replace this boundary with fake clients/processes.
+
 ## Validation-only public boundary
 
 The Managed Voice LLM evidence harness constructs a second ASGI app at `server/src/architecture_validation/public_server.py`. The live runner serves it on a separate loopback port and exposes only that port through ngrok. It contains authenticated Streamable HTTP MCP only. Local lifecycle and seed routes remain on the original FastAPI surface and are never mounted into the public app.
@@ -98,3 +115,4 @@ Both ASGI apps must run in one process because validation capabilities and synth
 - [Managed Agent Config](L2/managed_agent_config.md) — Full `agent.py` chain and tunable fields.
 - [Session Lifecycle](L2/session_lifecycle.md) — Detailed client orchestration including renewal.
 - [Verification Scripts](L2/verification_scripts.md) — How the contract harness asserts the proxy boundary.
+- [ACP Runtime](L2/acp_runtime.md) — Local Project Folder, readiness, and ACP boundary.

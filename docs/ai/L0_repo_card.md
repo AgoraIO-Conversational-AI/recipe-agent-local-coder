@@ -13,7 +13,7 @@
 | Owner         | Agora Conversational AI DevEx                                        |
 | Last Reviewed | 2026-08-15                                                           |
 | Recipe Role   | `base`                                                               |
-| Recipe Version | `1.0.0`                                                             |
+| Recipe Version | `1.1.0`                                                             |
 | Recipe Status | `experimental`                                                       |
 
 ## L1 — Summaries
@@ -30,3 +30,11 @@ The Audience column helps agents prioritise: **Use** = consuming the quickstart'
 | [06_interfaces](L1/06_interfaces.md)     | FastAPI route contracts, rewrites, env vars, managed agent payload     | Use & Maintain |
 | [07_gotchas](L1/07_gotchas.md)           | `AGENT_BACKEND_URL` dependency, doc drift, missing hook reference      | Maintain       |
 | [08_security](L1/08_security.md)         | Cert handling, CORS wide-open default, token expiry, server-only env   | Maintain       |
+
+## Derivative Local Runtime
+
+This repository also carries a local-only Codex foundation for a downstream
+voice-to-work derivative. Its Project Folder settings, ACP lifecycle, and
+`/api/local/*` routes are extension contracts, not part of the reusable
+three-route quickstart baseline. See [ACP Runtime](L1/L2/acp_runtime.md) when
+maintaining that derivative.

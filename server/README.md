@@ -26,6 +26,17 @@ Run the app:
 bun run dev
 ```
 
+For the local Codex foundation, run this from the repository root instead:
+
+```bash
+bun run dev:codex
+```
+
+It binds FastAPI to `127.0.0.1:8000`, serves the web app on `127.0.0.1:3000`,
+and lets FastAPI own the Project Folder picker and ACP child process. It does
+not start an Agora conversation until the browser user chooses **Start
+conversation**, and it does not run ngrok.
+
 This assumes the Agora CLI is installed and logged in. The command uses the project selected in your Agora CLI context, which is usually your default account project.
 
 If you are not using the Agora CLI, create the env file manually and fill in your project values:
@@ -139,6 +150,36 @@ curl -X POST http://localhost:8000/stopAgent \
 `/get_config` now issues one-hour RTC plus RTM tokens. The web client renews both before expiry, matching the reference Next.js session model.
 
 The repo-level `bun run verify:local:fastapi` check exercises this FastAPI app through the Next proxy path, but it swaps in a fake agent implementation so route wiring can be verified without depending on a live agent start.
+
+## Local ACP Runtime
+
+The Codex profile requires exactly one Project Folder. `WorkspaceService`
+resolves and persists it as a Workspace Scope in
+`~/Library/Application Support/Agora Voice ACP/workspace.json` by default;
+set `VOICE_ACP_STATE_DIR` only when a different local state directory is needed.
+The selected directory is ACP context for session creation and relative paths,
+not a filesystem sandbox.
+
+The loopback-only routes below are consumed through Next `/api/local/*`
+rewrites. They are derivative extensions and do not change the stable
+`/get_config`, `/startAgent`, or `/stopAgent` quickstart routes:
+
+- `GET`, `PUT`, `DELETE /local/workspace`
+- `POST /local/workspace/browse` (macOS native picker)
+- `GET /local/runtime`
+
+`LocalRuntimeCoordinator` starts ACP only for a ready workspace and keeps one
+session at a time. A folder replacement closes the old session before opening
+the new one; if the new session fails, the previous saved workspace record is
+restored. The default `CodexAcpClient` starts the pinned on-demand command
+`npx -y @agentclientprotocol/codex-acp@1.1.7`, uses `INITIAL_AGENT_MODE=agent`,
+and opens one ACP session with `mcp_servers=[]`. When advertised, ChatGPT is the
+only configured auth method; API-key auth is not configured.
+
+Advanced backend integrations may inject `CodexCommand` or an argv sequence
+into `CodexAcpClient`. There is no `CODEX_PATH` environment override in v0.1.
+Offline tests inject fake ACP clients/processes, so they do not validate a real
+`npx` invocation or browser sign-in.
 
 ## Requirements
 

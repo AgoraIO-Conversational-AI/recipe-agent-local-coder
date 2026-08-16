@@ -57,11 +57,26 @@ There is **no ESLint config file** in `web/` — Biome is the only TS/JS linter.
 | `useLocalMicrophoneTrack`  | Track creation + default `.close()` | Duplicate `track.close()` in StrictMode cleanup     |
 | `usePublish`               | Publish state                 | Manually `unpublish` to mute (use `setEnabled`)     |
 
+## Local ACP Conventions
+
+- Keep `WorkspaceService` responsible for resolved, durable one-directory
+  selection. The Project Folder is ACP context, never a sandbox claim.
+- Keep `/local/*` server routes loopback-only and expose them to the browser
+  only through the existing Next rewrite boundary under `/api/local/*`.
+- `LocalRuntimeCoordinator` owns serialized session open/close and exposes
+  safe readiness only. Do not leak ACP frames, private identifiers, raw
+  reasoning, auth data, or environment values.
+- `CodexAcpClient` owns one child process/session. It defaults to the pinned
+  command and may be constructed with injected `CodexCommand`/argv for
+  backend-controlled advanced uses. Do not imply a `CODEX_PATH` env override.
+
 ## Testing
 
 - Python: `server/tests/architecture_validation/` uses pytest for the Managed-path evidence harness. `bun run verify:backend` runs that suite after `py_compile`; ordinary backend route coverage still comes from the smoke scripts.
 - TS: no Vitest harness. The verification suite has **four layers** (see `docs/ai/L1/L2/verification_scripts.md`): Python compile, contract harness (`verify-api-contracts.ts`), rewrite stub (`verify-local-proxy.ts`), and FakeAgent FastAPI smoke (`verify-local-fastapi.ts`). The `verify:web:build` step rounds them out.
 - Keep architecture-validation Python tests under `server/tests/architecture_validation/` and run them without live Agora or model credentials.
+- ACP tests under `server/tests/acp_runtime/` use fake ACP clients/processes.
+  They are offline-safe but do not establish real package launch or browser auth.
 
 ## File Naming
 

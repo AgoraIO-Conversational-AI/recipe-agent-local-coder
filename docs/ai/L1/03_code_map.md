@@ -25,6 +25,7 @@ web/                      # Next.js 16 app (workspace member)
       QuickstartTranscriptPanel.tsx
       QuickstartPipelineMetrics.tsx
       QuickstartPreCallCard.tsx
+      ProjectFolderSettings.tsx  # blocking local Codex Project Folder gate
       ConnectionStatusPanel.tsx
       ConversationErrorCard.tsx
       MicrophoneSelector.tsx
@@ -49,6 +50,9 @@ web/                      # Next.js 16 app (workspace member)
     verify-api-contracts.ts
     verify-local-proxy.ts
     verify-local-fastapi.ts
+  src/lib/
+    workspace.ts        # Workspace Scope + readiness browser types
+    local-runtime.ts    # conversation-start readiness gate
   biome.json
   next.config.ts          # rewrites() (see 02_architecture)
   tsconfig.json
@@ -62,6 +66,12 @@ server/                   # Python FastAPI backend
     __init__.py
     server.py             # FastAPI app + APIRouter routes
     agent.py              # Agent class: start, stop, vendor chain
+    acp_runtime/
+      workspace.py        # durable one-folder Workspace Scope
+      routes.py           # loopback-only settings/readiness routes
+      picker.py           # backend-owned native macOS picker
+      codex.py            # ACP child process/session client
+      readiness.py        # one-session local readiness coordinator
     architecture_validation/
       admin.py            # Loopback-only state seeding
       config.py           # Fail-closed Managed-path evidence controls
@@ -93,6 +103,7 @@ server/                   # Python FastAPI backend
 | `web/scripts/verify-local-fastapi.ts`               | Spawns `server/scripts/run_fake_server.py`, exercises full path.         |
 | `server/src/server.py`                              | FastAPI app, env loading, three routes, response envelope, error mapping.|
 | `server/src/agent.py`                               | `Agent` class — vendor chain + async session lifecycle.                  |
+| `server/src/acp_runtime/`                           | Local Codex derivative: workspace persistence, ACP, and readiness.      |
 | `server/src/architecture_validation/`               | Managed Voice LLM evidence state, tools, and isolated public ingress.    |
 | `server/scripts/run_fake_server.py`                 | Patches `server.agent` to `FakeAgent` for verification.                  |
 

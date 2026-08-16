@@ -35,6 +35,29 @@ The sections below (Start Here, Patterns, Anti-Patterns, etc.) remain the canoni
 - Root scripts start FastAPI on `http://localhost:8000` and Next.js on `http://localhost:3000`.
 - The web app calls `/api/*`; Next rewrites those requests to the Python service through `AGENT_BACKEND_URL=http://localhost:8000`.
 
+### Local Codex Foundation
+
+- Run `bun run dev:codex` for the loopback-only local runtime. It starts FastAPI
+  on `127.0.0.1:8000` and Next on `127.0.0.1:3000`, with sibling cleanup.
+- The browser automatically opens the Project Folder Settings gate until an
+  existing directory is selected and the local runtime reports `ready`.
+- The selected resolved directory is persisted in
+  `~/Library/Application Support/Agora Voice ACP/workspace.json`, unless
+  `VOICE_ACP_STATE_DIR` overrides the state directory. It is ACP context, not a
+  filesystem sandbox.
+- The backend owns the native macOS picker and all `/local/*` routes; those
+  routes are loopback-only and reach the browser through `/api/local/*` rewrites.
+- `LocalRuntimeCoordinator` owns at most one ACP session. It starts ACP only
+  after a ready Workspace Scope and closes an old session before a replacement.
+- `CodexAcpClient` owns its child process and defaults to
+  `npx -y @agentclientprotocol/codex-acp@1.1.7` with `INITIAL_AGENT_MODE=agent`.
+  It uses an advertised ChatGPT auth method when available; no API-key mode is
+  configured. Advanced backend code may inject `CodexCommand` or argv, but
+  `CODEX_PATH` is not an implemented environment override in v0.1.
+- `bun run dev:codex` does not start an Agora conversation until the user starts
+  one and never starts ngrok. Do not infer live Codex or Agora acceptance from
+  offline checks.
+
 ### Managed Voice LLM Evidence Harness
 
 - Use `bun run validate:managed` only when live Agora usage is explicitly authorized; it consumes conversation minutes.
@@ -65,6 +88,8 @@ The sections below (Start Here, Patterns, Anti-Patterns, etc.) remain the canoni
 - `web/src/services/api.ts`: browser API client.
 - `server/src/server.py`: FastAPI entrypoints.
 - `server/src/agent.py`: async Agora agent lifecycle wrapper.
+- `server/src/acp_runtime/`: durable Workspace Scope, loopback settings routes,
+  ACP child-process client, and local readiness coordinator.
 
 ## Patterns
 
@@ -81,6 +106,10 @@ The sections below (Start Here, Patterns, Anti-Patterns, etc.) remain the canoni
 - Keep browser state and RTC/RTM lifecycle changes in `web`.
 - Treat `server/.env.local` as CLI-managed by default.
 - If you change request or response contracts, update the web client, backend, contract checks, and README together.
+- Preserve the three stable quickstart routes. Treat `/api/local/*` as
+  loopback-only derivative extensions, not a replacement public API.
+- Do not describe Project Folder as a sandbox or add an unreviewed
+  `CODEX_PATH` environment override; current command injection is backend-only.
 
 ## Commands
 
@@ -91,6 +120,7 @@ bun install
 bun run doctor
 bun run doctor:local
 bun run dev
+bun run dev:codex
 bun run verify
 bun run verify:local
 ```
@@ -102,6 +132,7 @@ bun run verify:web
 bun run verify:local:fastapi
 bun run verify:web:proxy
 bun run verify:backend
+bun run verify:launcher
 ```
 
 Inside `web/`, use:
@@ -123,6 +154,11 @@ bun run verify
   - `bun run verify:local`
 - Exercises the FastAPI route layer through Next with a fake agent implementation:
   - `bun run verify:local:fastapi`
+- Uses fake ACP clients/processes and does not run real `npx`/Codex or browser
+  authentication:
+  - `cd server && source venv/bin/activate && PYTHONPATH=src pytest -q`
+  - `bun run verify:backend`
+  - `bun run verify:web:proxy`
 - Often blocked inside restricted sandboxes because of port binding or Turbopack process spawning:
   - `bun run dev`
   - `bun run verify:web:build`
@@ -146,6 +182,9 @@ Before finishing a change:
 4. If you change required env vars or setup steps, update both the root README and the module README.
 5. Update README or architecture docs when developer workflow, request flow, or deployment guidance changes.
 6. If the change touches workflows, interfaces, gotchas, or security details, update the matching file under [docs/ai/L1/](docs/ai/L1/) and bump `Last Reviewed` in [docs/ai/L0_repo_card.md](docs/ai/L0_repo_card.md).
+7. Keep offline verification claims separate from live/manual checks for real
+   Codex package launch, browser authentication, native picker behavior, Agora
+   conversation start, and ngrok.
 
 ## Git Conventions
 

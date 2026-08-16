@@ -56,6 +56,7 @@ AGENT_BACKEND_URL=http://localhost:8000
 | `PORT`                   | Python (server)      | No       | Default `8000` (`server.py`).                                          |
 | `AGENT_BACKEND_URL`      | Next build (web)     | Yes for rewrites | Empty/missing → no `/api/*` rewrites registered. Required by `web/scripts/doctor.ts`. |
 | `NEXT_PUBLIC_AGENT_UID`  | Browser (web)        | No       | Optional UID override read in `ConversationComponent.tsx`.            |
+| `VOICE_ACP_STATE_DIR`    | Python (local Codex) | No       | Overrides the parent directory for persisted `workspace.json`.        |
 
 The optional Managed-path evidence harness additionally uses `VALIDATION_MODEL` and `PUBLIC_VALIDATION_BASE_URL`. It calls `update` and `say` through the authenticated Agent session and needs no separate model-provider credentials. The runner creates MCP capabilities in memory; do not add static capability tokens to `.env.local`.
 
@@ -78,6 +79,7 @@ The SDK is lower-bounded at v2 — add an upper bound or exact pin if you need r
 
 ```bash
 bun run dev                    # setup:env → setup:deps → concurrently {backend, frontend}
+bun run dev:codex              # loopback FastAPI + Next with local Codex readiness gate
 bun run dev:backend            # python3 server/src/server.py
 bun run dev:frontend           # cd web && AGENT_BACKEND_URL=http://localhost:8000 bun run dev
 bun run doctor                 # bun + node_modules sanity
@@ -89,6 +91,7 @@ bun run verify:backend         # compile server/src and run architecture-validat
 bun run verify:web:api         # web/scripts/verify-api-contracts.ts
 bun run verify:web:proxy       # web/scripts/verify-local-proxy.ts
 bun run verify:local:fastapi   # spawns server/scripts/run_fake_server.py
+bun run verify:launcher        # harmless child-process supervisor checks
 bun run clean                  # remove backend venv, node_modules, .next, web/dist
 bun run validate:managed       # optional interactive Managed evidence run; uses live Agora minutes
 ```
@@ -107,6 +110,24 @@ bun run validate:managed       # optional interactive Managed evidence run; uses
 | `bun run verify:backend`      | No          | Compile server sources + architecture-validation pytest |
 | `bun run verify:web:build`    | No          | `bun --filter web build`                             |
 | `bun run dev`                 | Yes (for use) | Port binding blocked in many sandboxes              |
+| `bun run dev:codex`           | No (until Start conversation) | Starts local services; no Agora call or ngrok by itself |
+| `cd server && ... pytest -q`  | No          | ACP tests inject fakes; no real `npx` or browser auth |
+
+## Local Codex Setup
+
+Run `bun run dev:codex`, then choose a Project Folder in the automatically
+opened Settings gate. The backend opens the native macOS picker; manual path
+entry is an advanced UI fallback. The chosen resolved directory is stored in
+`~/Library/Application Support/Agora Voice ACP/workspace.json` by default, or
+under `VOICE_ACP_STATE_DIR` when that variable is set.
+
+The folder supplies ACP session context and relative-path resolution; it is not
+a filesystem sandbox. The default ACP child command is
+`npx -y @agentclientprotocol/codex-acp@1.1.7`. If it advertises ChatGPT
+authentication, complete that local flow and retry. Offline checks cannot
+verify the package download, browser sign-in, native picker, Agora conversation,
+or ngrok. Advanced code can inject `CodexCommand` or argv into `CodexAcpClient`;
+`CODEX_PATH` is not an environment override in v0.1.
 
 ## Common Setup Failures
 

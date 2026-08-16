@@ -12,6 +12,26 @@
 
 `bun run dev` always exports `AGENT_BACKEND_URL=http://localhost:8000`. Deploy hosts must set it manually.
 
+## Project Folder Is Not a Sandbox
+
+The local Codex Project Folder is a persisted ACP Workspace Scope and context
+for one session. It does not restrict child-process filesystem access. The
+default state file is `~/Library/Application Support/Agora Voice ACP/workspace.json`;
+`VOICE_ACP_STATE_DIR` changes only the parent state directory.
+
+## Offline ACP Coverage Is Not Live Acceptance
+
+Fake ACP tests prove the client boundary, readiness serialization, loopback
+routes, and safe failure states. They do not prove a real `npx` download or
+Codex launch, ChatGPT browser authentication, macOS picker behavior, Agora
+conversation start, or ngrok. Treat each as an authorized manual/live check.
+
+## No `CODEX_PATH` Environment Override
+
+The v0.1 default is the pinned `npx` argv. Backend callers may inject
+`CodexCommand` or an argv sequence in code; no environment parser maps
+`CODEX_PATH` to the command. Do not document it as supported.
+
 ## No `web/app/api/**/route.ts`
 
 `web/scripts/verify-api-contracts.ts` asserts that no `app/api` route handlers exist. The web client must be rewrite-only. Adding a Next route handler would:

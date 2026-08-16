@@ -1,5 +1,5 @@
 ---
-recipe_version: 1.0.0
+recipe_version: 1.1.0
 recipe_status: experimental
 extension_points:
   - id: api.routes
@@ -24,6 +24,9 @@ stable_contracts:
     summary: GET /api/get_config, POST /api/startAgent, and POST /api/stopAgent remain the browser-facing contract.
   - id: response.envelope
     summary: Successful backend responses use { code, msg, data }.
+derivative_extensions:
+  - id: local.codex-runtime
+    summary: Loopback-only Project Folder and ACP readiness foundation for the local Codex derivative.
 ---
 
 # Recipe Contract
@@ -84,6 +87,35 @@ Do not recreate Agora ConvoAI integration from memory. Provider schemas, SDK bui
 | `POST /api/stopAgent` | Body `{ agentId }`; returns `{ code: 0, msg: "success" }`. |
 | Success envelope | `{ "code": 0, "msg": "success", "data": ... }` where route has data. |
 | Verification entry points | `bun run verify:web`, `bun run verify:backend`, `bun run verify:web:proxy`, `bun run verify:local:fastapi`, `bun run verify:local`. |
+
+## Derivative Local Codex Extension
+
+The repository's local Codex foundation is intentionally separate from the
+base quickstart contract. It adds Next rewrite-only `/api/local/*` routes for
+loopback FastAPI `/local/*` endpoints:
+
+| Browser route | Backend route | Purpose |
+| --- | --- | --- |
+| `GET`, `PUT`, `DELETE /api/local/workspace` | `/local/workspace` | Read, save, or clear one Project Folder Workspace Scope. |
+| `POST /api/local/workspace/browse` | `/local/workspace/browse` | Use the backend-owned native macOS picker. |
+| `GET /api/local/runtime` | `/local/runtime` | Read safe ACP readiness state. |
+
+`bun run dev:codex` starts the loopback backend and frontend. The browser gate
+requires one existing Project Folder before conversation start. That resolved
+folder is persisted locally and passed to ACP as session context; it is not a
+filesystem sandbox. The Codex profile supports one primary directory with no
+additional directories.
+
+`CodexAcpClient` starts one child process/session at a time through ACP. Its
+default is `npx -y @agentclientprotocol/codex-acp@1.1.7` with
+`INITIAL_AGENT_MODE=agent`, and it uses ChatGPT authentication only if the
+agent advertises it. Backend code can inject `CodexCommand` or argv; no
+`CODEX_PATH` environment override or API-key auth mode is implemented in v0.1.
+
+The extension's fake ACP, local proxy, fake FastAPI, and build checks are
+offline-safe. They do not validate real `npx` execution, browser authentication,
+native picker behavior, Agora conversation start, or ngrok; those are
+live/manual checks.
 
 ## Internal / Subject to Change
 
