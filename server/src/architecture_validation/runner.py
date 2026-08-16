@@ -12,6 +12,7 @@ from typing import Any
 
 import httpx
 import uvicorn
+from dotenv import load_dotenv
 
 from .config import CORPUS_PATH, ValidationConfig
 from .models import (
@@ -201,6 +202,7 @@ async def verify_public_route_isolation(
 
 
 async def run_live(path: VoiceLlmPath) -> int:
+    load_dotenv(Path(__file__).parents[2] / ".env.local", override=False)
     config = ValidationConfig.from_env()
     if config.path != path:
         raise ValueError(f"VOICE_LLM_PATH is {config.path}, expected {path}")
