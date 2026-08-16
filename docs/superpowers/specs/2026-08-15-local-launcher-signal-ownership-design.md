@@ -19,10 +19,12 @@ children and ports are removed in both cases.
 
 ## Decision
 
-Use one thin local supervisor as the sole owner of terminal signals. The
-supervisor starts the existing `concurrently` command in a separate process
-group, waits for it, and forwards exactly one shutdown signal when the
-supervisor receives SIGINT or SIGTERM.
+Use one thin Local Launcher Supervisor as the sole owner of terminal signals.
+The supervisor starts the existing `concurrently` command in a separate process
+group and waits for it. On normal shutdown, it forwards exactly one signal to
+the `concurrently` root process only. Backend and frontend descendants do not
+receive the terminal signal directly; `concurrently` remains responsible for
+stopping its siblings once.
 
 The shell launcher remains responsible for argument parsing and the existing
 environment contract. It delegates only process-group lifecycle to the
@@ -34,20 +36,22 @@ configuration, and Agora behavior do not change.
 - Normal child completion preserves the existing `concurrently --success first`
   result.
 - The first SIGINT or SIGTERM starts shutdown and is forwarded once to the
-  supervised process group.
+  `concurrently` root process, not broadcast to its process group.
 - Later signals while shutdown is in progress do not trigger duplicate graceful
   shutdown delivery.
 - The supervisor waits for the group to exit and does not leave backend,
   frontend, or ACP descendants running.
+- If graceful cleanup exceeds its bounded deadline, the supervisor may escalate
+  against the isolated process group so unresponsive descendants cannot remain.
 - User interruption may return a conventional non-zero interrupted exit status;
   clean logs and complete cleanup are the required behavior.
 
 ## Implementation Boundary
 
-Add one small supervisor under `scripts/` using the repository's existing
-Python runtime. Keep `scripts/run-local-codex.sh` as the public launcher and
-replace its background `concurrently` plus trap logic with one foreground
-supervisor call.
+Add one small Local Launcher Supervisor under `scripts/` using the repository's
+existing Python runtime. Keep `scripts/run-local-codex.sh` as the public
+launcher and replace its background `concurrently` plus trap logic with one
+foreground supervisor call.
 
 The supervisor accepts the backend and frontend commands as opaque argument
 values. It does not parse shell command content, credentials, Workspace paths,
@@ -59,9 +63,10 @@ Extend `scripts/verify-local-launcher.ts` with a process-group interrupt test
 that:
 
 1. launches the real shell launcher with deterministic fake siblings;
-2. sends SIGINT as a terminal process-group event;
+2. sends SIGINT as a terminal process-group event to the supervisor;
 3. asserts both fake siblings exit;
-4. asserts shutdown delivery is not duplicated; and
+4. asserts the supervisor signals only the `concurrently` root during graceful
+   shutdown and sibling shutdown delivery is not duplicated; and
 5. asserts launcher output contains no traceback.
 
 Retain the existing tests for opaque advanced overrides, invalid arguments,

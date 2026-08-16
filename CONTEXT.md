@@ -31,3 +31,8 @@ The user-facing name for the Workspace Scope's primary directory: where the Agen
 ## Configuration Gate
 
 The blocking pre-ready state shown when the active Agent Profile requires a Project Folder and no valid selection exists. Settings remains available after the gate is cleared so the selection can be changed safely.
+
+## Local Launcher Supervisor
+
+The local-only lifecycle boundary that owns terminal signals and coordinates one clean shutdown of the backend, frontend, and their descendants.
+_Avoid_: Signal broadcaster, process-group launcher
