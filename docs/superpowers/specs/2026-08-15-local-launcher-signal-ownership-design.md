@@ -47,6 +47,11 @@ configuration, and Agora behavior do not change.
 - User interruption may return a conventional non-zero interrupted exit status;
   clean logs and complete cleanup are the required behavior.
 
+The supervisor preserves `concurrently`'s exit status for normal completion or
+a child failure. A completed SIGINT shutdown returns `130`, a completed SIGTERM
+shutdown returns `143`, and forced cleanup after a second Ctrl-C or the
+10-second deadline returns `137`.
+
 ## Implementation Boundary
 
 Add one small Local Launcher Supervisor under `scripts/` using the repository's
