@@ -53,14 +53,25 @@ do not alter the stable quickstart routes above:
 
 ## Local Workspace and Runtime Contract
 
-Every `/local/*` response uses `{ "code": 0, "msg": "success", "data": ... }`
-and rejects non-loopback callers with `403`.
+Successful `/local/*` responses use
+`{ "code": 0, "msg": "success", "data": ... }`. FastAPI error responses use
+`{ "detail": "..." }`, consistent with the rest of the backend:
+
+| Status | Local-runtime condition | Error body |
+| --- | --- | --- |
+| `403` | Caller is not loopback | `{ "detail": "..." }` |
+| `400` | `PUT` path is not an existing directory | `{ "detail": "Project Folder must be an existing directory" }` |
+| `409` | Picker cancellation or a Workspace switch guard conflict | `{ "detail": "..." }` |
+| `503` | Candidate folder could not activate the local ACP runtime | `{ "detail": "..." }` |
+
+FastAPI also returns its normal validation error body for an invalid request
+shape. Clients must not expect a success envelope on non-2xx responses.
 
 `WorkspaceStatus` contains `state` (`unconfigured`, `ready`, or `invalid`), a
 Codex `profile`, and an optional workspace `{ id, label, primary_directory }`.
 The profile requires one primary directory and supports no additional directories.
 `PUT` accepts `{ "path": "..." }`; the path must resolve to an existing
-directory. Browse cancellation returns `409`. `LocalRuntimeStatus` uses
+directory. `LocalRuntimeStatus` uses
 `configuration_required`, `starting`, `authentication_required`, `ready`, or
 `failed`, plus `workspace` and an optional safe `error`.
 

@@ -2,14 +2,15 @@
 
 > **When to Read This:** Load this document when you are adding a route, changing the proxy boundary, debugging a failing `bun run verify*` command, or expanding the contract harness.
 
-## The Four Verification Layers
+## The Verification Layers
 
 | Layer                    | Script / Tool                                | Bun target                | What it asserts                                              |
 | ------------------------ | -------------------------------------------- | ------------------------- | ------------------------------------------------------------ |
-| Python compile + unit    | `compileall` + validation pytest             | `bun run verify:backend`  | Python source compiles and validation behavior passes         |
+| Python compile + unit    | `compileall` + validation + ACP-runtime pytest | `bun run verify:backend`  | Python source compiles; validation and fake ACP runtime behavior pass |
 | Web → Rewrite contract   | `web/scripts/verify-api-contracts.ts`        | `bun run verify:web:api`  | No `app/api` routes; `/api/*` rewrites + fetch shapes correct |
 | Web → rewrite stub       | `web/scripts/verify-local-proxy.ts`          | `bun run verify:web:proxy`| Imports `next.config.ts`, resolves rewrites, fetches an in-process stub directly |
 | Web → FastAPI + FakeAgent| `web/scripts/verify-local-fastapi.ts`        | `bun run verify:local:fastapi` | Spawns FastAPI with `FakeAgent` patched in              |
+| Local launcher           | `scripts/verify-local-launcher.ts`           | `bun run verify:launcher` | Harmless child stubs prove sibling cleanup on failure, SIGINT, and SIGTERM |
 
 `bun run verify` is the production-bound chain (`doctor` → `verify:web:api` → `verify:web:build`). `bun run verify:local` is the dev-bound chain (`doctor:local` → `verify:backend` → `verify:local:fastapi` → `verify:web:proxy` → `verify:web:build`).
 
@@ -60,13 +61,51 @@ What it does:
 
 This is the closest CI gets to a full integration test. It never makes outbound calls.
 
-## Python Compile and Validation Tests
+## Python Compile, Validation, and ACP Runtime Tests
 
-`bun run verify:backend` compiles `server/src/` and runs the credential-free tests under `server/tests/architecture_validation/`. It catches:
+`bun run verify:backend` compiles `server/src/` and runs the credential-free
+tests under `server/tests/architecture_validation/` and
+`server/tests/acp_runtime/`. The ACP runtime suite covers:
+
+- Workspace Scope persistence, existing-directory validation, and state changes.
+- Loopback-only workspace/readiness routes, picker cancellation, selection
+  rollback, and switch-guard conflicts.
+- The macOS picker through a mocked subprocess boundary; it never opens a real
+  picker during the suite.
+- Serialized local readiness with fake ACP clients: one active session,
+  replacement close-before-open, authentication failure, generic failure, and
+  concurrent lifecycle handling.
+- `CodexAcpClient` through a repository-owned fake ACP process that records
+  protocol method names only. It validates initialization, advertised ChatGPT
+  authentication, `new_session`, and process cleanup without starting Codex.
+
+It catches:
 
 - Syntax errors.
+- Regression in the validation or local ACP foundation contracts listed above.
 
-It does **not** execute module imports, load env, or catch logic regressions. Pair it with `verify:local:fastapi` whenever you change route behavior.
+It does **not** run the real pinned `npx` ACP package, complete browser
+authentication, start an Agora conversation, open ngrok, or operate a real
+native picker. Pair it with `verify:local:fastapi` whenever you change route
+behavior.
+
+## `verify-local-launcher.ts`
+
+Purpose: prove local launcher cleanup without starting the backend, frontend,
+ACP, or any network endpoint.
+
+What it does:
+
+1. Checks that `dev:codex` delegates to `scripts/run-local-codex.sh` and that
+   the launcher has the expected cleanup trap and sibling-kill behavior.
+2. Starts the launcher only with injected harmless shell stubs through
+   `LOCAL_BACKEND_COMMAND` and `LOCAL_FRONTEND_COMMAND`.
+3. Proves a failing child returns failure and terminates its sibling.
+4. Proves SIGINT and SIGTERM terminate both stub child processes.
+
+The injection variables are test seams, not normal end-user command overrides.
+This check does not launch the real `dev:codex` services, Codex, browser auth,
+Agora, ngrok, or the native picker.
 
 ## Adding a New Route — Checklist
 
@@ -82,6 +121,9 @@ It does **not** execute module imports, load env, or catch logic regressions. Pa
 - They do not call the real Agora Conversational AI API. Vendor model changes will not be caught by `bun run verify`.
 - They do not exercise RTC or RTM at the wire level. Browser regression testing requires `bun run dev` plus a real Agora project.
 - They do not run lint/format. Run `bun run lint` separately.
+- They do not prove the real Codex ACP package can download through `npx`, a
+  ChatGPT browser sign-in can complete, the native picker works on the host, or
+  ngrok ingress is reachable. These are separately authorized live/manual checks.
 
 ## Failure Modes
 
