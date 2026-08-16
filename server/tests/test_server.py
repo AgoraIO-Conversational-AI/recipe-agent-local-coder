@@ -23,6 +23,14 @@ def test_get_config_remaps_zero_uid_and_honors_channel(client):
     assert data["channel_name"] == "test-channel"
 
 
+def test_local_workspace_route_is_mounted_without_configuration(client):
+    response = client.get("/local/workspace")
+
+    assert response.status_code == 200
+    assert response.json()["data"]["state"] == "unconfigured"
+    assert response.json()["data"]["profile"]["id"] == "codex"
+
+
 def test_start_agent_calls_agent_and_returns_shape(client):
     response = client.post(
         "/startAgent",

@@ -2,7 +2,14 @@ import { existsSync, readdirSync } from 'node:fs'
 import path from 'node:path'
 
 import nextConfig from '../next.config'
-import { getConfig, startAgent, stopAgent } from '../src/services/api'
+import {
+  browseWorkspace,
+  getConfig,
+  getWorkspace,
+  selectWorkspace,
+  startAgent,
+  stopAgent,
+} from '../src/services/api'
 
 type Rewrite = {
   source: string
@@ -66,6 +73,22 @@ async function verifyRewriteContract() {
         (rewrite) => rewrite.source === '/api/stopAgent' && rewrite.destination === 'http://localhost:8000/stopAgent',
       ),
       'next.config.ts should rewrite /api/stopAgent to /stopAgent on the Python backend',
+    )
+    assert(
+      rewrites.some(
+        (rewrite) =>
+          rewrite.source === '/api/local/workspace' &&
+          rewrite.destination === 'http://localhost:8000/local/workspace',
+      ),
+      'next.config.ts should rewrite /api/local/workspace to the loopback backend',
+    )
+    assert(
+      rewrites.some(
+        (rewrite) =>
+          rewrite.source === '/api/local/workspace/browse' &&
+          rewrite.destination === 'http://localhost:8000/local/workspace/browse',
+      ),
+      'next.config.ts should rewrite /api/local/workspace/browse to the loopback backend',
     )
   } finally {
     if (originalBackendUrl) {
@@ -151,6 +174,51 @@ async function verifyApiClientRequests() {
       return Response.json({ code: 0, msg: 'success' })
     }
 
+    if (url.pathname === '/api/local/workspace') {
+      const ready = {
+        state: 'ready',
+        profile: {
+          id: 'codex',
+          label: 'Codex',
+          requires_primary_directory: true,
+          supports_additional_directories: false,
+        },
+        workspace: {
+          id: 'workspace-a',
+          label: 'project',
+          primary_directory: '/tmp/project',
+        },
+      }
+      if (init?.method === 'GET') {
+        return Response.json({ code: 0, data: ready, msg: 'success' })
+      }
+      assert(init?.method === 'PUT', 'Project Folder manual selection should use PUT')
+      assert(getRequestBody(init).path === '/tmp/project', 'Project Folder PUT should include path')
+      return Response.json({ code: 0, data: ready, msg: 'success' })
+    }
+
+    if (url.pathname === '/api/local/workspace/browse') {
+      assert(init?.method === 'POST', 'Project Folder browse should use POST')
+      return Response.json({
+        code: 0,
+        data: {
+          state: 'ready',
+          profile: {
+            id: 'codex',
+            label: 'Codex',
+            requires_primary_directory: true,
+            supports_additional_directories: false,
+          },
+          workspace: {
+            id: 'workspace-a',
+            label: 'project',
+            primary_directory: '/tmp/project',
+          },
+        },
+        msg: 'success',
+      })
+    }
+
     return Response.json({ detail: `Unexpected request path: ${url.pathname}` }, { status: 404 })
   }) as typeof fetch
 
@@ -163,8 +231,21 @@ async function verifyApiClientRequests() {
 
     await stopAgent(agentId)
 
+    const workspace = await getWorkspace()
+    assert(workspace.state === 'ready', 'GET /api/local/workspace should return status')
+    await browseWorkspace()
+    await selectWorkspace('/tmp/project')
+
     assert(
-      JSON.stringify(seenPaths) === JSON.stringify(['/api/get_config', '/api/startAgent', '/api/stopAgent']),
+      JSON.stringify(seenPaths) ===
+        JSON.stringify([
+          '/api/get_config',
+          '/api/startAgent',
+          '/api/stopAgent',
+          '/api/local/workspace',
+          '/api/local/workspace/browse',
+          '/api/local/workspace',
+        ]),
       'API client should call the unversioned /api paths',
     )
   } finally {

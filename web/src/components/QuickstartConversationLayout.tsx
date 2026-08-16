@@ -1,6 +1,7 @@
 "use client";
 
 import Image from "next/image";
+import { Settings2 } from "lucide-react";
 import type { ReactNode } from "react";
 
 import { Button } from "@/components/ui/button";
@@ -12,6 +13,7 @@ type QuickstartConversationLayoutProps = {
 	visualizer: ReactNode;
 	controls: ReactNode;
 	onEndConversation: () => void;
+	onOpenSettings: () => void;
 };
 
 export function QuickstartConversationLayout({
@@ -21,6 +23,7 @@ export function QuickstartConversationLayout({
 	visualizer,
 	controls,
 	onEndConversation,
+	onOpenSettings,
 }: QuickstartConversationLayoutProps) {
 	return (
 		<div className="flex min-h-0 flex-1 flex-col text-left">
@@ -44,9 +47,20 @@ export function QuickstartConversationLayout({
 				<div className="flex items-center gap-2 md:pr-1">
 					{statusPanel}
 					<Button
+						variant="secondary"
+						size="sm"
+						className="h-10 rounded-xl px-3 text-xs font-medium transition-transform duration-150 active:scale-[0.96] md:h-8 md:rounded-lg"
+						onClick={onOpenSettings}
+						aria-label="Open Project Folder settings"
+						title="Project Folder settings"
+					>
+						<Settings2 className="h-4 w-4" aria-hidden="true" />
+						<span className="hidden sm:inline">Settings</span>
+					</Button>
+					<Button
 						variant="destructive"
 						size="sm"
-						className="h-8 rounded-md border border-destructive bg-transparent px-3 text-xs font-medium text-destructive hover:bg-destructive/10"
+						className="h-10 rounded-xl border border-destructive bg-transparent px-3 text-xs font-medium text-destructive transition-transform duration-150 hover:bg-destructive/10 active:scale-[0.96] md:h-8 md:rounded-lg"
 						onClick={onEndConversation}
 						aria-label="End conversation with AI agent"
 						title="End conversation"

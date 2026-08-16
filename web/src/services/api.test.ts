@@ -1,6 +1,13 @@
 import { afterEach, expect, test } from 'bun:test'
 
-import { getConfig, startAgent, stopAgent } from './api'
+import {
+  browseWorkspace,
+  getConfig,
+  getWorkspace,
+  selectWorkspace,
+  startAgent,
+  stopAgent,
+} from './api'
 
 const originalFetch = globalThis.fetch
 let lastCall: { url: string; init?: RequestInit }
@@ -55,4 +62,80 @@ test('stopAgent posts the agentId', async () => {
 test('getConfig throws on an error response', async () => {
   mockFetch(500, { detail: 'boom' })
   await expect(getConfig()).rejects.toThrow('boom')
+})
+
+test('getWorkspace returns the local Workspace status', async () => {
+  mockFetch(200, {
+    code: 0,
+    msg: 'success',
+    data: {
+      state: 'unconfigured',
+      profile: {
+        id: 'codex',
+        label: 'Codex',
+        requires_primary_directory: true,
+        supports_additional_directories: false,
+      },
+      workspace: null,
+    },
+  })
+
+  const status = await getWorkspace()
+
+  expect(status.state).toBe('unconfigured')
+  expect(lastCall.url).toContain('/api/local/workspace')
+  expect(lastCall.init?.method).toBe('GET')
+})
+
+test('browseWorkspace posts only to the local browse route', async () => {
+  mockFetch(200, {
+    code: 0,
+    msg: 'success',
+    data: {
+      state: 'ready',
+      profile: {
+        id: 'codex',
+        label: 'Codex',
+        requires_primary_directory: true,
+        supports_additional_directories: false,
+      },
+      workspace: {
+        id: 'workspace-a',
+        label: 'project',
+        primary_directory: '/tmp/project',
+      },
+    },
+  })
+
+  await browseWorkspace()
+
+  expect(lastCall.url).toContain('/api/local/workspace/browse')
+  expect(lastCall.init?.method).toBe('POST')
+  expect(lastCall.init?.body).toBeUndefined()
+})
+
+test('selectWorkspace sends the advanced manual path', async () => {
+  mockFetch(200, {
+    code: 0,
+    msg: 'success',
+    data: {
+      state: 'ready',
+      profile: {
+        id: 'codex',
+        label: 'Codex',
+        requires_primary_directory: true,
+        supports_additional_directories: false,
+      },
+      workspace: {
+        id: 'workspace-a',
+        label: 'project',
+        primary_directory: '/tmp/project',
+      },
+    },
+  })
+
+  await selectWorkspace('/tmp/project')
+
+  expect(lastCall.init?.method).toBe('PUT')
+  expect(JSON.parse(String(lastCall.init?.body))).toEqual({ path: '/tmp/project' })
 })

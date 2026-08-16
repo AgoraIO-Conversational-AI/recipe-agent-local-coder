@@ -47,7 +47,7 @@ export default function RootLayout({
 }) {
 	return (
 		<html lang="en" className={`${instrumentSans.variable} h-full`}>
-			<body className="h-full min-h-screen">{children}</body>
+			<body className="h-full min-h-screen antialiased">{children}</body>
 		</html>
 	);
 }

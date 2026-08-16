@@ -86,6 +86,7 @@ export default function ConversationComponent({
 	rtmClient,
 	onTokenWillExpire,
 	onEndConversation,
+	onOpenSettings,
 }: ConversationComponentProps) {
 	const client = useRTCClient();
 	const remoteUsers = useRemoteUsers();
@@ -487,6 +488,7 @@ export default function ConversationComponent({
 				</fieldset>
 			}
 			onEndConversation={handleEndConversation}
+			onOpenSettings={onOpenSettings}
 		/>
 	);
 }

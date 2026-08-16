@@ -1,3 +1,5 @@
+import type { WorkspaceStatus } from '@/lib/workspace'
+
 const API_BASE_URL = '/api'
 
 export interface GetConfigResponse {
@@ -68,4 +70,43 @@ export async function stopAgent(agentId: string): Promise<void> {
     const error = await response.json()
     throw new Error(error.detail || `HTTP ${response.status}`)
   }
+}
+
+async function readWorkspaceResponse(response: Response): Promise<WorkspaceStatus> {
+  const result = await response.json()
+  if (!response.ok) {
+    throw new Error(result.detail || `HTTP ${response.status}`)
+  }
+  if (result.code !== 0 || !result.data) {
+    throw new Error(result.msg || 'Failed to get Project Folder configuration')
+  }
+  return result.data
+}
+
+export async function getWorkspace(): Promise<WorkspaceStatus> {
+  return readWorkspaceResponse(
+    await fetch(`${API_BASE_URL}/local/workspace`, { method: 'GET' }),
+  )
+}
+
+export async function browseWorkspace(): Promise<WorkspaceStatus> {
+  return readWorkspaceResponse(
+    await fetch(`${API_BASE_URL}/local/workspace/browse`, { method: 'POST' }),
+  )
+}
+
+export async function selectWorkspace(path: string): Promise<WorkspaceStatus> {
+  return readWorkspaceResponse(
+    await fetch(`${API_BASE_URL}/local/workspace`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ path }),
+    }),
+  )
+}
+
+export async function clearWorkspace(): Promise<WorkspaceStatus> {
+  return readWorkspaceResponse(
+    await fetch(`${API_BASE_URL}/local/workspace`, { method: 'DELETE' }),
+  )
 }

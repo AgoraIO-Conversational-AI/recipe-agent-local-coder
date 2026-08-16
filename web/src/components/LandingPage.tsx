@@ -7,9 +7,17 @@ import { Suspense, useCallback, useEffect, useRef, useState } from "react";
 
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { LoadingSkeleton } from "@/components/LoadingSkeleton";
+import { ProjectFolderSettings } from "@/components/ProjectFolderSettings";
 import { QuickstartPreCallCard } from "@/components/QuickstartPreCallCard";
 import { ShareButton } from "@/components/share-button";
-import { getConfig, startAgent, stopAgent } from "@/services/api";
+import {
+	getConfig,
+	getWorkspace,
+	startAgent,
+	stopAgent,
+} from "@/services/api";
+import type { WorkspaceStatus } from "@/lib/workspace";
+import { workspaceNeedsConfiguration } from "@/lib/workspace";
 import type { AgoraRenewalTokens, AgoraTokenData } from "@/types/conversation";
 
 const ConversationComponent = dynamic(
@@ -93,13 +101,44 @@ export default function LandingPage() {
 	const [isLoading, setIsLoading] = useState(false);
 	const [error, setError] = useState<string | null>(null);
 	const [agentJoinError, setAgentJoinError] = useState(false);
+	const [workspaceStatus, setWorkspaceStatus] =
+		useState<WorkspaceStatus | null>(null);
+	const [workspaceError, setWorkspaceError] = useState<string | null>(null);
+	const [settingsOpen, setSettingsOpen] = useState(false);
 
 	useEffect(() => {
 		import("agora-rtc-react").catch(() => {});
 		import("agora-rtm").catch(() => {});
 	}, []);
 
+	useEffect(() => {
+		let cancelled = false;
+		getWorkspace()
+			.then((status) => {
+				if (cancelled) return;
+				setWorkspaceStatus(status);
+				setWorkspaceError(null);
+				if (workspaceNeedsConfiguration(status)) setSettingsOpen(true);
+			})
+			.catch((nextError) => {
+				if (cancelled) return;
+				setWorkspaceError(
+					nextError instanceof Error
+						? nextError.message
+						: "Could not load Project Folder settings",
+				);
+				setSettingsOpen(true);
+			});
+		return () => {
+			cancelled = true;
+		};
+	}, []);
+
 	const handleStartConversation = async () => {
+		if (!workspaceStatus || workspaceNeedsConfiguration(workspaceStatus)) {
+			setSettingsOpen(true);
+			return;
+		}
 		setIsLoading(true);
 		setError(null);
 		setAgentJoinError(false);
@@ -209,6 +248,7 @@ export default function LandingPage() {
 							isLoading={isLoading}
 							error={error}
 							onStartConversation={handleStartConversation}
+							onOpenSettings={() => setSettingsOpen(true)}
 						/>
 					) : agoraData && rtmClient ? (
 						<>
@@ -226,6 +266,7 @@ export default function LandingPage() {
 											rtmClient={rtmClient}
 											onTokenWillExpire={handleTokenWillExpire}
 											onEndConversation={handleEndConversation}
+											onOpenSettings={() => setSettingsOpen(true)}
 										/>
 									</AgoraProvider>
 								</ErrorBoundary>
@@ -268,6 +309,22 @@ export default function LandingPage() {
 					</a>
 				</div>
 			</footer>
+
+			<ProjectFolderSettings
+				open={settingsOpen}
+				status={workspaceStatus}
+				initialError={workspaceError}
+				onStatusChange={(status) => {
+					setWorkspaceStatus(status);
+					setWorkspaceError(null);
+					if (!workspaceNeedsConfiguration(status)) setSettingsOpen(false);
+				}}
+				onClose={() => {
+					if (workspaceStatus && !workspaceNeedsConfiguration(workspaceStatus)) {
+						setSettingsOpen(false);
+					}
+				}}
+			/>
 		</div>
 	);
 }

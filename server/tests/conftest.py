@@ -60,8 +60,9 @@ class FakeAgent:
 
 
 @pytest.fixture
-def server_module(fake_env):
+def server_module(fake_env, monkeypatch, tmp_path):
     """Import server.py fresh, with the fake env + neutralized dotenv applied."""
+    monkeypatch.setenv("VOICE_ACP_STATE_DIR", str(tmp_path / "voice-acp-state"))
     sys.modules.pop("server", None)
     sys.modules.pop("agent", None)
     import server
