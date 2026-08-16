@@ -52,6 +52,9 @@ Terminal -> Local Launcher Supervisor -> concurrently -> backend + frontend
   `concurrently` root process, not broadcast to its process group.
 - SIGHUP, including terminal-window closure, follows the same graceful-first
   path so isolated descendants cannot remain after their terminal disappears.
+  The supervisor maps HUP to SIGTERM at the `concurrently` root because
+  `concurrently` forwards its received root signal to both children, while the
+  supervisor still reports the conventional HUP exit status `129`.
 - A second SIGINT while graceful shutdown is in progress skips the remaining
   wait and sends SIGKILL to the isolated process group.
 - The supervisor waits for the group to exit and does not leave backend,
