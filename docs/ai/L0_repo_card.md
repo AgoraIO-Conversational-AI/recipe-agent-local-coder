@@ -34,7 +34,7 @@ The Audience column helps agents prioritise: **Use** = consuming the quickstart'
 ## Derivative Local Runtime
 
 This repository also carries a local-only Codex foundation for a downstream
-voice-to-work derivative. Its Project Folder settings, ACP lifecycle, and
-`/api/local/*` routes are extension contracts, not part of the reusable
+voice-to-work derivative. Its asynchronous Project Folder picker, ACP lifecycle,
+and `/api/local/*` routes are extension contracts, not part of the reusable
 three-route quickstart baseline. See [ACP Runtime](L1/L2/acp_runtime.md) when
 maintaining that derivative.

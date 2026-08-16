@@ -117,7 +117,8 @@ the reusable three-route quickstart contract:
 | `/local/workspace` | GET | Return Project Folder profile, scope, and state |
 | `/local/workspace` | PUT | Resolve, persist, and activate an existing Project Folder |
 | `/local/workspace` | DELETE | Close local ACP and clear the saved selection |
-| `/local/workspace/browse` | POST | Open the backend-owned native macOS folder picker |
+| `/local/workspace/browse` | POST | Start one backend-owned native macOS folder picker operation and return `202` |
+| `/local/workspace/browse/{operation_id}` | GET | Poll the current picker operation until ready, cancelled, or failed |
 | `/local/runtime` | GET | Return safe local ACP readiness state without starting ACP |
 | `/local/runtime` | POST | Explicitly activate ACP for a valid saved Workspace |
 

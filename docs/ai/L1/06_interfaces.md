@@ -38,6 +38,7 @@ production mode:
 | --- | --- | --- |
 | `/api/local/workspace` | `${AGENT_BACKEND_URL}/local/workspace` | GET, PUT, DELETE |
 | `/api/local/workspace/browse` | `${AGENT_BACKEND_URL}/local/workspace/browse` | POST |
+| `/api/local/workspace/browse/:operationId` | `${AGENT_BACKEND_URL}/local/workspace/browse/:operationId` | GET |
 | `/api/local/runtime` | `${AGENT_BACKEND_URL}/local/runtime` | GET, POST |
 
 `verify-api-contracts.ts` asserts that no `web/app/api/**/route.ts` files exist. Adding one would create a competing handler in front of the rewrite — don't.

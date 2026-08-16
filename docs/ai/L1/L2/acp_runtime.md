@@ -47,13 +47,15 @@ success envelope.
 | `GET /api/local/workspace` | `GET /local/workspace` | Read `WorkspaceStatus`. |
 | `PUT /api/local/workspace` | `PUT /local/workspace` | Validate, save, and activate `{ path }`. |
 | `DELETE /api/local/workspace` | `DELETE /local/workspace` | Close ACP and clear saved scope. |
-| `POST /api/local/workspace/browse` | `POST /local/workspace/browse` | Run native picker and activate result. |
+| `POST /api/local/workspace/browse` | `POST /local/workspace/browse` | Start the native picker and return `202` plus an opaque operation ID. |
+| `GET /api/local/workspace/browse/:operationId` | `GET /local/workspace/browse/{operation_id}` | Poll `picking` to `ready`, `cancelled`, or `failed`; `ready` includes `WorkspaceStatus`. |
 | `GET /api/local/runtime` | `GET /local/runtime` | Read `LocalRuntimeStatus`; never starts ACP. |
 | `POST /api/local/runtime` | `POST /local/runtime` | Explicitly activate ACP for a valid saved Workspace. |
 
 Non-loopback callers receive `403`. Invalid folder selection receives `400`.
-Picker cancellation receives `409`. A replacement that cannot make ACP ready
-returns `503` and restores the prior persisted folder selection.
+Picker cancellation and activation failures are terminal operation states, so
+the start request never stays open behind the Next proxy. A replacement that
+cannot make ACP ready restores the prior persisted folder selection.
 
 `WorkspaceStatus.state` is `unconfigured`, `ready`, or `invalid`.
 `LocalRuntimeStatus.state` is `configuration_required`, `starting`,
@@ -68,6 +70,10 @@ authentication failures into the user-safe ChatGPT sign-in instruction. Other
 failures use one fixed safe message and never include exception text. Ordinary
 FastAPI startup invokes only shutdown cleanup; the local browser flow explicitly
 starts a saved Workspace.
+
+`CodexAcpClient.close()` is idempotent. It treats only a transport-level
+`ConnectionError` from `session/close` as an already completed close and still
+exits the child-process context; other failures remain visible.
 
 `CodexAcpClient` validates the resolved absolute directory, owns the child
 process, initializes ACP, and creates one session with `mcp_servers=[]`. The

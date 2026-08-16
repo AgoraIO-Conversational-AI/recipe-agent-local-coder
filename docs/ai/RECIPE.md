@@ -97,7 +97,8 @@ loopback FastAPI `/local/*` endpoints:
 | Browser route | Backend route | Purpose |
 | --- | --- | --- |
 | `GET`, `PUT`, `DELETE /api/local/workspace` | `/local/workspace` | Read, save, or clear one Project Folder Workspace Scope. |
-| `POST /api/local/workspace/browse` | `/local/workspace/browse` | Use the backend-owned native macOS picker. |
+| `POST /api/local/workspace/browse` | `/local/workspace/browse` | Start the backend-owned native macOS picker and return an operation ID. |
+| `GET /api/local/workspace/browse/:operationId` | `/local/workspace/browse/{operation_id}` | Poll the picker operation to a terminal state. |
 | `GET /api/local/runtime` | `/local/runtime` | Read safe ACP readiness state without starting ACP. |
 | `POST /api/local/runtime` | `/local/runtime` | Explicitly activate ACP for a valid saved Workspace. |
 

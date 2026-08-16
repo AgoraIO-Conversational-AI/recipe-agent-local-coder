@@ -107,6 +107,14 @@ async function verifyRewriteContract() {
     assert(
       rewrites.some(
         (rewrite) =>
+          rewrite.source === '/api/local/workspace/browse/:operationId' &&
+          rewrite.destination === 'http://localhost:8000/local/workspace/browse/:operationId',
+      ),
+      'next.config.ts should rewrite Project Folder picker polling to the loopback backend',
+    )
+    assert(
+      rewrites.some(
+        (rewrite) =>
           rewrite.source === '/api/local/runtime' && rewrite.destination === 'http://localhost:8000/local/runtime',
       ),
       'next.config.ts should rewrite /api/local/runtime to the loopback backend',
@@ -237,20 +245,36 @@ async function verifyApiClientRequests() {
 
     if (url.pathname === '/api/local/workspace/browse') {
       assert(init?.method === 'POST', 'Project Folder browse should use POST')
+      return Response.json(
+        {
+          code: 0,
+          data: { operation_id: 'browse-contract', state: 'picking' },
+          msg: 'success',
+        },
+        { status: 202 },
+      )
+    }
+
+    if (url.pathname === '/api/local/workspace/browse/browse-contract') {
+      assert(init?.method === 'GET', 'Project Folder browse status should use GET')
       return Response.json({
         code: 0,
         data: {
+          operation_id: 'browse-contract',
           state: 'ready',
-          profile: {
-            id: 'codex',
-            label: 'Codex',
-            requires_primary_directory: true,
-            supports_additional_directories: false,
-          },
           workspace: {
-            id: 'workspace-a',
-            label: 'project',
-            primary_directory: '/tmp/project',
+            state: 'ready',
+            profile: {
+              id: 'codex',
+              label: 'Codex',
+              requires_primary_directory: true,
+              supports_additional_directories: false,
+            },
+            workspace: {
+              id: 'workspace-a',
+              label: 'project',
+              primary_directory: '/tmp/project',
+            },
           },
         },
         msg: 'success',
@@ -300,7 +324,7 @@ async function verifyApiClientRequests() {
 
     const workspace = await getWorkspace()
     assert(workspace.state === 'ready', 'GET /api/local/workspace should return status')
-    await browseWorkspace()
+    await browseWorkspace({ pollIntervalMs: 0 })
     await selectWorkspace('/tmp/project')
     const runtime = await getLocalRuntime()
     assert(runtime.state === 'ready', 'GET /api/local/runtime should return readiness')
@@ -317,6 +341,7 @@ async function verifyApiClientRequests() {
           '/api/stopAgent',
           '/api/local/workspace',
           '/api/local/workspace/browse',
+          '/api/local/workspace/browse/browse-contract',
           '/api/local/workspace',
           '/api/local/runtime',
           '/api/local/runtime',

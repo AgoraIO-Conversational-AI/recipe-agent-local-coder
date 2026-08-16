@@ -170,7 +170,8 @@ backend. They are derivative extensions and do not change the stable
 `/get_config`, `/startAgent`, or `/stopAgent` quickstart routes:
 
 - `GET`, `PUT`, `DELETE /local/workspace`
-- `POST /local/workspace/browse` (macOS native picker)
+- `POST /local/workspace/browse` (start the macOS native picker; returns `202` and an operation ID)
+- `GET /local/workspace/browse/{operation_id}` (poll picker status)
 - `GET /local/runtime` (readiness only; never starts ACP)
 - `POST /local/runtime` (explicitly activate a valid saved Workspace)
 
@@ -178,7 +179,9 @@ Ordinary FastAPI startup never starts ACP. `LocalRuntimeCoordinator` starts it
 only through the explicit local-runtime flow for a ready workspace and keeps
 one session at a time. A folder replacement closes the old session before
 opening the new one; if the new session fails, the previous saved workspace
-record is restored. The default `CodexAcpClient` starts the pinned on-demand command
+record is restored. If the ACP child has already closed its transport during
+shutdown, that transport close is treated as complete while process cleanup
+still runs. The default `CodexAcpClient` starts the pinned on-demand command
 `npx -y @agentclientprotocol/codex-acp@1.1.7`, uses `INITIAL_AGENT_MODE=agent`,
 and opens one ACP session with `mcp_servers=[]`. Session creation is attempted
 with reusable credentials first. A typed authentication-required response uses
