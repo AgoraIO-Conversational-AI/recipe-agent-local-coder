@@ -20,6 +20,10 @@ RATE_LIMITS: dict[str, int] = {
     "cancel_work": 20,
     "respond_permission": 20,
 }
+_RATE_BUCKETS: dict[str, str] = {
+    "cancel_work": "mutation",
+    "respond_permission": "mutation",
+}
 
 
 class CapabilityRegistryError(RuntimeError):
@@ -129,7 +133,7 @@ class CapabilityRegistry:
 
 
 class CapabilityRateLimiter:
-    """Apply independent sliding one-minute budgets per credential and tool."""
+    """Apply sliding one-minute read/start budgets and one shared mutation budget."""
 
     def __init__(self, clock: Callable[[], float] | None = None) -> None:
         self._clock = clock or time.monotonic
@@ -146,7 +150,8 @@ class CapabilityRateLimiter:
         if limit is None:
             raise ValueError(f"Unsupported capability operation: {operation}")
         timestamp = self._clock() if now is None else now
-        calls = self._calls[(credential_id, operation)]
+        bucket = _RATE_BUCKETS.get(operation, operation)
+        calls = self._calls[(credential_id, bucket)]
         cutoff = timestamp - 60.0
         while calls and calls[0] <= cutoff:
             calls.popleft()

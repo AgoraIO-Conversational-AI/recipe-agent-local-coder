@@ -81,6 +81,7 @@ def coordinator_context():
         registry=registry,
         host_policy=IngressHostPolicy(),
         handler_tracker=tracker,
+        health_interval=0.001,
     )
     return SimpleNamespace(
         events=events,
@@ -131,7 +132,10 @@ async def test_activation_binds_exact_agent_and_url_change_requires_replacement(
     context.tunnel.current = TunnelStatus(
         "ready", public_base_url="https://replacement.example.ngrok.app"
     )
-    await context.coordinator.refresh_health()
+    for _ in range(100):
+        if context.registry.resolve("test-bearer") is None:
+            break
+        await asyncio.sleep(0.002)
 
     assert context.registry.resolve("test-bearer") is None
     assert context.coordinator.current_workspace_identity() is None
@@ -155,7 +159,10 @@ async def test_tunnel_loss_blocks_new_calls_without_cancelling_local_work(
         "failed", error="ngrok_tunnel_unavailable"
     )
 
-    await context.coordinator.refresh_health()
+    for _ in range(100):
+        if context.coordinator.current_workspace_identity() is None:
+            break
+        await asyncio.sleep(0.002)
 
     assert context.coordinator.current_workspace_identity() is None
     assert context.registry.resolve("test-bearer") is not None
@@ -184,13 +191,26 @@ async def test_quiesce_revokes_then_drains_before_transport_close(
 
 
 @pytest.mark.anyio
-async def test_drain_deadline_cancels_no_work_and_closes_entry(coordinator_context):
+async def test_drain_deadline_cancels_held_handler_and_closes_entry(
+    coordinator_context,
+):
     context = coordinator_context
     await context.coordinator.start()
-    assert context.tracker.try_enter() is True
+    entered = asyncio.Event()
 
+    async def held_handler():
+        assert context.tracker.try_enter() is True
+        entered.set()
+        try:
+            await asyncio.Event().wait()
+        finally:
+            context.tracker.leave()
+
+    handler = asyncio.create_task(held_handler())
+    await entered.wait()
     drained = await context.coordinator.quiesce(timeout=0.001)
 
     assert drained is False
     assert context.tracker.try_enter() is False
-    context.tracker.leave()
+    with pytest.raises(asyncio.CancelledError):
+        await handler

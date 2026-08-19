@@ -5,7 +5,7 @@ import json
 import pytest
 from fastapi.testclient import TestClient
 
-from managed_ingress.capabilities import CapabilityRegistry
+from managed_ingress.capabilities import CapabilityRateLimiter, CapabilityRegistry
 from managed_ingress.http_policy import IngressHostPolicy, McpIngressMiddleware
 from managed_ingress.mcp_app import create_mcp_server
 from managed_ingress.public_server import create_public_app
@@ -128,6 +128,38 @@ def test_dynamic_host_origin_content_type_and_body_limits_fail_closed():
     assert wrong_origin.status_code == 403
     assert wrong_type.status_code == 415
     assert too_large.status_code == 413
+
+
+def test_tool_rate_exhaustion_returns_http_429():
+    registry, bearer = active_registry()
+    app = create_public_app(
+        tools=FakeTools(),
+        registry=registry,
+        host_policy=IngressHostPolicy(),
+        rate_limiter=CapabilityRateLimiter(clock=lambda: 100.0),
+    )
+    request = {
+        "jsonrpc": "2.0",
+        "id": 1,
+        "method": "tools/call",
+        "params": {
+            "name": "start_work",
+            "arguments": {"objective": "test", "idempotency_key": "turn-a"},
+        },
+    }
+
+    with TestClient(app) as client:
+        responses = [
+            client.post(
+                "/mcp/",
+                headers={"Authorization": f"Bearer {bearer}"},
+                json=request,
+            )
+            for _ in range(11)
+        ]
+
+    assert responses[-1].status_code == 429
+    assert responses[-1].json() == {"code": "rate_limited"}
 
 
 @pytest.mark.anyio

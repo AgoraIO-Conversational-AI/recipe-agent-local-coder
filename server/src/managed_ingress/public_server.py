@@ -4,7 +4,7 @@ from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 
-from .capabilities import CapabilityRegistry
+from .capabilities import CapabilityRateLimiter, CapabilityRegistry
 from .http_policy import IngressHostPolicy, McpIngressMiddleware
 from .mcp_app import create_mcp_server
 from .tools import ManagedWorkTools
@@ -16,6 +16,7 @@ def create_public_app(
     registry: CapabilityRegistry,
     host_policy: IngressHostPolicy,
     handler_tracker=None,
+    rate_limiter: CapabilityRateLimiter | None = None,
 ) -> FastAPI:
     mcp = create_mcp_server(tools)
     mcp_asgi = McpIngressMiddleware(
@@ -23,6 +24,7 @@ def create_public_app(
         registry=registry,
         host_policy=host_policy,
         handler_tracker=handler_tracker,
+        rate_limiter=rate_limiter or CapabilityRateLimiter(),
     )
 
     @asynccontextmanager

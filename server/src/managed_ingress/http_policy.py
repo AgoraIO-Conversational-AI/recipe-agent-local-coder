@@ -7,7 +7,12 @@ from contextvars import ContextVar
 from typing import Protocol
 from urllib.parse import urlparse
 
-from .capabilities import CapabilityRegistry
+from .capabilities import (
+    CapabilityLimitError,
+    CapabilityRateLimiter,
+    CapabilityRegistry,
+    RATE_LIMITS,
+)
 from .models import CapabilityBinding
 
 
@@ -90,11 +95,13 @@ class McpIngressMiddleware:
         registry: CapabilityRegistry,
         host_policy: IngressHostPolicy,
         handler_tracker: HandlerTracker | None = None,
+        rate_limiter: CapabilityRateLimiter | None = None,
     ) -> None:
         self._app = app
         self._registry = registry
         self._host_policy = host_policy
         self._handler_tracker = handler_tracker
+        self._rate_limiter = rate_limiter
 
     async def __call__(self, scope, receive, send) -> None:
         if scope["type"] != "http":
@@ -155,6 +162,16 @@ class McpIngressMiddleware:
                         await _respond(send, 413, "request_too_large")
                         return
                     more_body = bool(message.get("more_body", False))
+                if self._rate_limiter is not None:
+                    try:
+                        operations = _tool_operations(bytes(body))
+                        for operation in operations:
+                            self._rate_limiter.consume(
+                                binding.credential_id, operation
+                            )
+                    except CapabilityLimitError:
+                        await _respond(send, 429, "rate_limited")
+                        return
                 delivered = False
 
                 async def replay_receive():
@@ -188,3 +205,20 @@ async def _respond(send, status: int, code: str, *, bearer: bool = False) -> Non
         headers.append((b"www-authenticate", b"Bearer"))
     await send({"type": "http.response.start", "status": status, "headers": headers})
     await send({"type": "http.response.body", "body": body})
+
+
+def _tool_operations(body: bytes) -> tuple[str, ...]:
+    try:
+        payload = json.loads(body)
+    except (json.JSONDecodeError, UnicodeDecodeError):
+        return ()
+    messages = payload if isinstance(payload, list) else [payload]
+    operations = []
+    for message in messages:
+        if not isinstance(message, dict) or message.get("method") != "tools/call":
+            continue
+        params = message.get("params")
+        name = params.get("name") if isinstance(params, dict) else None
+        if isinstance(name, str) and name in RATE_LIMITS:
+            operations.append(name)
+    return tuple(operations)

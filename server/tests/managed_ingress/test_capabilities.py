@@ -69,7 +69,7 @@ def test_wrong_bearer_never_resolves_and_revocation_is_idempotent():
     registry.revoke_active()
 
 
-def test_rate_limiter_uses_separate_sliding_public_budgets():
+def test_rate_limiter_uses_sliding_public_budgets_with_shared_mutations():
     limiter = CapabilityRateLimiter()
     for _ in range(10):
         limiter.consume("credential-a", "start_work", now=100.0)
@@ -83,6 +83,14 @@ def test_rate_limiter_uses_separate_sliding_public_budgets():
 
     limiter.consume("credential-b", "start_work", now=100.0)
     limiter.consume("credential-a", "start_work", now=160.001)
+
+    for index in range(20):
+        operation = "cancel_work" if index % 2 == 0 else "respond_permission"
+        limiter.consume("credential-a", operation, now=200.0)
+    with pytest.raises(CapabilityLimitError, match="rate_limited"):
+        limiter.consume("credential-a", "cancel_work", now=200.0)
+    with pytest.raises(CapabilityLimitError, match="rate_limited"):
+        limiter.consume("credential-a", "respond_permission", now=200.0)
 
 
 def test_rate_limiter_rejects_unknown_operations():

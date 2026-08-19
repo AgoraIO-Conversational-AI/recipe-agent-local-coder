@@ -333,13 +333,7 @@ class Agent:
         if not agent_id or not str(agent_id).strip():
             raise ValueError("agent_id is required and cannot be empty")
 
-        session = self._sessions.pop(agent_id, None)
-        binding = self._bindings.pop(agent_id, None)
-        work_lease = self._work_leases.pop(agent_id, None)
-        if binding is not None:
-            capability_registry.expire_session_sync(binding.session_id)
-        if work_lease is not None and self.work_bridge is not None:
-            await self.work_bridge.revoke_agent(work_lease.lease_id)
+        session = await self._detach_owned_session(agent_id)
         if session:
             try:
                 await session.stop()
@@ -359,13 +353,9 @@ class Agent:
     async def close(self) -> None:
         """Revoke and stop every locally owned session without unknown-ID fallback."""
         for agent_id in list(self._sessions):
-            session = self._sessions.pop(agent_id)
-            binding = self._bindings.pop(agent_id, None)
-            if binding is not None:
-                capability_registry.expire_session_sync(binding.session_id)
-            work_lease = self._work_leases.pop(agent_id, None)
-            if work_lease is not None and self.work_bridge is not None:
-                await self.work_bridge.revoke_agent(work_lease.lease_id)
+            session = await self._detach_owned_session(agent_id)
+            if session is None:
+                continue
             try:
                 await session.stop()
             except Exception as exc:
@@ -375,6 +365,17 @@ class Agent:
                     agent_id,
                     type(exc).__name__,
                 )
+
+    async def _detach_owned_session(self, agent_id: str) -> Any | None:
+        """Remove local ownership and revoke every capability before stopping."""
+        session = self._sessions.pop(agent_id, None)
+        binding = self._bindings.pop(agent_id, None)
+        if binding is not None:
+            capability_registry.expire_session_sync(binding.session_id)
+        work_lease = self._work_leases.pop(agent_id, None)
+        if work_lease is not None and self.work_bridge is not None:
+            await self.work_bridge.revoke_agent(work_lease.lease_id)
+        return session
 
     def active_validation_session(
         self,

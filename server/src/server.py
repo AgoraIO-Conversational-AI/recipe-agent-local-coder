@@ -277,17 +277,18 @@ def create_app(
             host_policy=managed_host_policy,
             handler_tracker=managed_handler_tracker,
         )
+        managed_rate_limiter = CapabilityRateLimiter()
         managed_tools = ManagedWorkTools(
             runtime=task_runtime,
             store=work_store,
             workspace_generation=managed_ingress,
-            rate_limiter=CapabilityRateLimiter(),
         )
         public_app_holder["app"] = create_managed_public_app(
             tools=managed_tools,
             registry=managed_registry,
             host_policy=managed_host_policy,
             handler_tracker=managed_handler_tracker,
+            rate_limiter=managed_rate_limiter,
         )
         try:
             managed_agent = Agent(work_bridge=managed_ingress)

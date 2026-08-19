@@ -33,11 +33,14 @@ bun run dev:codex
 ```
 
 It binds FastAPI to `127.0.0.1:8000`, serves the web app on `127.0.0.1:3000`,
-and lets FastAPI own the Project Folder picker and ACP child process. It does
-not start an Agora conversation until the browser user chooses **Start
-conversation**, and it does not run ngrok. Preflight requires macOS Apple
-Silicon, Bun/Node/Python, and usable Agora configuration without printing
-credential values.
+and lets FastAPI own the Project Folder picker, ACP child process, Task Runtime,
+and dedicated MCP listener on `127.0.0.1:8001`. It does not start an Agora
+conversation until the browser user chooses **Start conversation**. At that
+point it starts ngrok, discovers the public MCP URL through the loopback API on
+port `4041`, and binds one capability to the Agent. Preflight requires macOS
+Apple Silicon, Bun/Node/Python/ngrok, and usable Agora configuration without
+printing credential values. Install ngrok and run
+`ngrok config add-authtoken ...` once before this flow.
 
 This assumes the Agora CLI is installed and logged in. The command uses the project selected in your Agora CLI context, which is usually your default account project.
 

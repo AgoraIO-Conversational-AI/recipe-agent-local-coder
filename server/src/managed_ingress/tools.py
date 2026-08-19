@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 from typing import Protocol
 
 from task_runtime.models import WorkReceipt
@@ -9,7 +10,6 @@ from task_runtime.permissions import PermissionBrokerError
 from task_runtime.runtime import TaskRuntime, TaskRuntimeError
 from task_runtime.store import WorkStore
 
-from .capabilities import CapabilityLimitError, CapabilityRateLimiter
 from .models import CapabilityBinding
 
 
@@ -25,7 +25,8 @@ _PUBLIC_RUNTIME_ERRORS = {
     "work_queue_budget_exceeded",
     "workspace_not_ready",
 }
-_INLINE_PROJECTION_BYTES = 240 * 1024
+_PUBLIC_STATUS_BYTES = 256 * 1024
+_TRUNCATION_SUFFIX = "\n\nResult shortened for voice status."
 
 
 class WorkspaceGenerationPort(Protocol):
@@ -42,12 +43,10 @@ class ManagedWorkTools:
         runtime: TaskRuntime,
         store: WorkStore,
         workspace_generation: WorkspaceGenerationPort,
-        rate_limiter: CapabilityRateLimiter,
     ) -> None:
         self._runtime = runtime
         self._store = store
         self._workspace_generation = workspace_generation
-        self._rate_limiter = rate_limiter
 
     async def start_work(
         self,
@@ -126,10 +125,6 @@ class ManagedWorkTools:
         current = self._workspace_generation.current_workspace_identity()
         if current != (binding.workspace_id, binding.workspace_generation):
             return {"code": "runtime_unavailable", "retriable": True}
-        try:
-            self._rate_limiter.consume(binding.credential_id, operation)
-        except CapabilityLimitError:
-            return {"code": "rate_limited", "retriable": True}
         return None
 
     def _status_projection(self, receipt: WorkReceipt) -> dict[str, object]:
@@ -137,7 +132,7 @@ class ManagedWorkTools:
         if permission is not None and permission.work_id != receipt.work_id:
             permission = None
         presentation = receipt.final_presentation
-        return {
+        projection = {
             "code": "work_found",
             "work_id": receipt.work_id,
             "objective": receipt.objective,
@@ -147,7 +142,7 @@ class ManagedWorkTools:
                 {
                     "speech": presentation.speech,
                     "inline": (
-                        _bounded_inline(presentation.inline)
+                        presentation.inline
                         if presentation.inline is not None
                         else None
                     ),
@@ -162,6 +157,7 @@ class ManagedWorkTools:
                 else None
             ),
         }
+        return _bounded_status(projection)
 
 
 def _public_error(exc: Exception) -> dict[str, object]:
@@ -175,10 +171,34 @@ def _public_error(exc: Exception) -> dict[str, object]:
     return {"code": code}
 
 
-def _bounded_inline(value: str) -> str:
-    encoded = value.encode("utf-8")
-    if len(encoded) <= _INLINE_PROJECTION_BYTES:
-        return value
-    suffix = "\n\nResult shortened for voice status."
-    room = _INLINE_PROJECTION_BYTES - len(suffix.encode("utf-8"))
-    return encoded[:room].decode("utf-8", errors="ignore").rstrip() + suffix
+def _serialized_size(value: dict[str, object]) -> int:
+    return len(
+        json.dumps(value, ensure_ascii=False, separators=(",", ":")).encode("utf-8")
+    )
+
+
+def _bounded_status(projection: dict[str, object]) -> dict[str, object]:
+    if _serialized_size(projection) <= _PUBLIC_STATUS_BYTES:
+        return projection
+    presentation = projection.get("final_presentation")
+    if not isinstance(presentation, dict):
+        return projection
+    inline = presentation.get("inline")
+    if not isinstance(inline, str):
+        return projection
+    presentation["inline"] = _TRUNCATION_SUFFIX
+    encoded = inline.encode("utf-8")
+    low = 0
+    high = len(encoded)
+    best = ""
+    while low <= high:
+        midpoint = (low + high) // 2
+        candidate = encoded[:midpoint].decode("utf-8", errors="ignore").rstrip()
+        presentation["inline"] = candidate + _TRUNCATION_SUFFIX
+        if _serialized_size(projection) <= _PUBLIC_STATUS_BYTES:
+            best = candidate
+            low = midpoint + 1
+        else:
+            high = midpoint - 1
+    presentation["inline"] = best + _TRUNCATION_SUFFIX
+    return projection

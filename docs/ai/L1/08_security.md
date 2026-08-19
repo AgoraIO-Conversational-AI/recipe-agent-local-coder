@@ -127,7 +127,8 @@ If you need real auth, add a FastAPI dependency that validates a header on each 
   app exposes only four tools, authenticates before reading request bodies,
   enforces Host/Origin/method/content-type policy and a 64 KiB pre-read cap,
   and derives Agent/Workspace authority from a memory-only bearer.
-- Capabilities are generation-bound, rate-limited per tool, and revoked before
+- Capabilities are generation-bound, use separate start/status budgets plus a
+  shared cancellation/permission mutation budget, and are revoked before
   Agent or tunnel shutdown. Tool projections omit filesystem paths, internal
   identifiers, raw ACP frames, and unbounded results.
 - Reusable credentials are tried before authentication. Only a typed

@@ -40,11 +40,15 @@ class IngressHandlerTracker:
         self._active = 0
         self._empty = asyncio.Event()
         self._empty.set()
+        self._tasks: set[asyncio.Task] = set()
 
     def try_enter(self) -> bool:
         if not self._accepting:
             return False
         self._active += 1
+        task = asyncio.current_task()
+        if task is not None:
+            self._tasks.add(task)
         self._empty.clear()
         return True
 
@@ -52,6 +56,9 @@ class IngressHandlerTracker:
         if self._active <= 0:
             return
         self._active -= 1
+        task = asyncio.current_task()
+        if task is not None:
+            self._tasks.discard(task)
         if self._active == 0:
             self._empty.set()
 
@@ -62,6 +69,11 @@ class IngressHandlerTracker:
         try:
             await asyncio.wait_for(self._empty.wait(), timeout)
         except TimeoutError:
+            tasks = tuple(self._tasks)
+            for task in tasks:
+                task.cancel()
+            if tasks:
+                await asyncio.gather(*tasks, return_exceptions=True)
             return False
         return True
 
@@ -123,6 +135,7 @@ class ManagedIngressCoordinator:
         registry: CapabilityRegistry,
         host_policy: IngressHostPolicy,
         handler_tracker: IngressHandlerTracker,
+        health_interval: float = 1.0,
     ) -> None:
         self._readiness = readiness
         if listener is None and listener_factory is None:
@@ -133,6 +146,7 @@ class ManagedIngressCoordinator:
         self._registry = registry
         self._host_policy = host_policy
         self.handler_tracker = handler_tracker
+        self._health_interval = health_interval
         self._lock = asyncio.Lock()
         self._started = False
         self._quiesced = False
@@ -142,6 +156,7 @@ class ManagedIngressCoordinator:
         self._active_lease_id: str | None = None
         self._restart_required = False
         self._accepting = False
+        self._health_task: asyncio.Task[None] | None = None
 
     async def start(self) -> None:
         async with self._lock:
@@ -152,6 +167,9 @@ class ManagedIngressCoordinator:
                 self._listener = self._listener_factory()
             await self._listener.start()
             self._started = True
+            self._health_task = asyncio.create_task(
+                self._monitor_health(), name="managed-ingress-health"
+            )
 
     async def prepare_agent(self) -> VoiceMcpLease:
         async with self._lock:
@@ -227,6 +245,7 @@ class ManagedIngressCoordinator:
                 return True
             self._registry.revoke_active()
             self._quiesced = True
+        await self._stop_health_monitor()
         drained = await self.handler_tracker.stop_and_drain(timeout)
         self._accepting = False
         self._host_policy.deactivate()
@@ -239,6 +258,29 @@ class ManagedIngressCoordinator:
             await self._tunnel.close()
             await self._listener.close()
             self._started = False
+
+    async def _monitor_health(self) -> None:
+        try:
+            while True:
+                await asyncio.sleep(self._health_interval)
+                if self._public_base_url is not None:
+                    try:
+                        await self.refresh_health()
+                    except Exception:
+                        self._accepting = False
+        except asyncio.CancelledError:
+            raise
+
+    async def _stop_health_monitor(self) -> None:
+        task = self._health_task
+        self._health_task = None
+        if task is None:
+            return
+        task.cancel()
+        try:
+            await task
+        except asyncio.CancelledError:
+            pass
 
     def _ready_workspace_id(self) -> str:
         status = self._readiness.status()

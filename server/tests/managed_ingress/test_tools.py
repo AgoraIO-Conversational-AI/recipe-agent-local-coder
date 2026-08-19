@@ -1,6 +1,7 @@
 """Safe public tool projections backed by the real Task Runtime."""
 
 import asyncio
+import json
 from dataclasses import dataclass
 
 import pytest
@@ -13,10 +14,10 @@ from acp_runtime.acp_client import (
 )
 from acp_runtime.readiness import LocalRuntimeCoordinator
 from acp_runtime.workspace import WorkspaceConfigStore, WorkspaceService
-from managed_ingress.capabilities import CapabilityRateLimiter
 from managed_ingress.models import CapabilityBinding
 from managed_ingress.tools import ManagedWorkTools
 from task_runtime.permissions import PermissionBroker
+from task_runtime.models import FinalPresentation, WorkReceipt
 from task_runtime.runtime import TaskRuntime
 from task_runtime.store import WorkStore
 
@@ -80,7 +81,6 @@ async def tools_context(tmp_path):
         runtime=runtime,
         store=store,
         workspace_generation=generation,
-        rate_limiter=CapabilityRateLimiter(),
     )
     binding = CapabilityBinding(
         credential_id="credential-a",
@@ -168,6 +168,35 @@ async def test_cancel_and_permission_errors_expose_no_internal_ids(tools_context
     assert await tools.respond_permission(binding=binding, decision="allow") == {
         "code": "permission_not_found"
     }
+
+
+@pytest.mark.anyio
+async def test_serialized_status_is_bounded_to_256_kib(tools_context):
+    tools, _runtime, _store, _acp, _generation, _binding = tools_context
+    receipt = WorkReceipt(
+        work_id="work-a",
+        workspace_id="scope-a",
+        idempotency_key="turn-a",
+        objective="o" * (16 * 1024),
+        state="completed",
+        created_at="now",
+        updated_at="now",
+        final_presentation=FinalPresentation(
+            speech="s" * (16 * 1024),
+            inline="i" * (256 * 1024),
+        ),
+        delivery_state="pending_delivery",
+    )
+
+    projection = tools._status_projection(receipt)
+
+    serialized = json.dumps(
+        projection, ensure_ascii=False, separators=(",", ":")
+    ).encode("utf-8")
+    assert len(serialized) <= 256 * 1024
+    assert projection["final_presentation"]["inline"].endswith(
+        "Result shortened for voice status."
+    )
 
 
 @pytest.mark.anyio

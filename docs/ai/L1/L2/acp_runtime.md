@@ -139,10 +139,12 @@ Agora Agent and current Workspace generation. The capability is activated only
 after Agent creation succeeds and revoked before Agent or tunnel shutdown.
 
 The public app contains no lifecycle, settings, admin, docs, or OpenAPI routes.
-It authenticates before body reads, applies request-size and per-tool rate
-budgets, and returns only safe bounded projections. A tunnel URL change forces
-Agent restart. SSE/Activity Panel, Agora Speak, proactive announcements, and
-reconnect rehydration remain deferred.
+It authenticates before body reads, applies request-size limits, start/status
+budgets, a shared mutation budget, and safe bounded projections. Rate
+exhaustion returns HTTP `429`. A background health check closes Work acceptance
+on tunnel loss and forces Agent restart when the public URL changes.
+SSE/Activity Panel, Agora Speak, proactive announcements, and reconnect
+rehydration remain deferred.
 
 ## Verification Boundary
 
