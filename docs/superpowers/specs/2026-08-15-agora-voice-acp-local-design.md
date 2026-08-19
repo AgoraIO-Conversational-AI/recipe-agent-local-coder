@@ -384,25 +384,34 @@ The cascading STT-LLM-TTS pipeline is required because the Speak API is not supp
 
 The v0.1 ngrok integration is explicitly a temporary developer POC, not a production remote-access design.
 
-Each launcher run creates a high-entropy capability token and publishes an endpoint shaped like:
+Each active Agora Agent receives a high-entropy capability token. The launcher
+publishes a fixed MCP endpoint and supplies the capability through the Agent's
+MCP authorization header:
 
 ```text
-https://<ephemeral-ngrok-domain>/mcp/<per-run-capability>
+https://<ephemeral-ngrok-domain>/mcp/
+Authorization: Bearer <per-Agent-capability>
 ```
 
 The MCP listener:
 
-- accepts only the active capability path;
+- accepts only an active bearer bound to the current Workspace generation and
+  exact Agora Agent ID;
 - rejects invalid capabilities before parsing MCP payloads;
 - expires the capability when the launcher exits;
-- redacts the token and full endpoint from logs;
+- redacts the token from logs;
 - validates request size, content type, method, and Origin when present;
 - applies per-capability rate limits;
 - exposes no management, token, Agora lifecycle, SSE, database, or debug endpoint.
 
 The ingress uses explicit route allowlisting and never exposes an LLM callback. Pointing ngrok directly at an application port that also serves unauthenticated lifecycle endpoints is not permitted.
 
-The listener binds to loopback and is reached publicly only through the active ngrok process. The capability URL is a development bearer capability, not full identity authentication. Documentation must tell users to stop the launcher when finished and must not recommend unattended or production operation.
+The listener binds to loopback and is reached publicly only through the active
+ngrok process. The capability is a development bearer credential, not full
+identity authentication. Documentation must tell users to stop the launcher
+when finished and must not recommend unattended or production operation. The
+detailed lifecycle and failure contract is defined in
+[Managed MCP and ngrok Ingress](2026-08-19-managed-mcp-ngrok-ingress-design.md).
 
 A production evolution replaces ngrok with an authenticated hosted bridge to which the Local Runner creates an outbound connection. That change must not alter the Task Runtime or ACP client interfaces.
 
