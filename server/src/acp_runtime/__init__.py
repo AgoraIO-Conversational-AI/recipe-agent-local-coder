@@ -3,7 +3,11 @@
 from .acp_client import (
     AcpAuthenticationRequired,
     AcpClientPort,
+    AcpPermissionOption,
+    AcpPermissionOutcome,
     AcpPermissionRequest,
+    AcpPromptObserver,
+    AcpPromptResult,
     AcpSession,
     AcpSessionEvent,
 )
@@ -19,7 +23,11 @@ from .workspace import (
 __all__ = [
     "AcpClientPort",
     "AcpAuthenticationRequired",
+    "AcpPermissionOption",
+    "AcpPermissionOutcome",
     "AcpPermissionRequest",
+    "AcpPromptObserver",
+    "AcpPromptResult",
     "AcpSession",
     "AcpSessionEvent",
     "LocalRuntimeCoordinator",

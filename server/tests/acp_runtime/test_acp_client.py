@@ -1,14 +1,33 @@
 """ACP process/session lifecycle tests through the runtime's public boundary."""
 
+import asyncio
 import json
 from types import SimpleNamespace
 
 import acp
 import pytest
 
-from acp_runtime.acp_client import AcpAuthenticationRequired
+from acp_runtime.acp_client import (
+    AcpAuthenticationRequired,
+    AcpPermissionOutcome,
+    AcpPromptObserver,
+)
 from acp_runtime.codex import CodexAcpClient, CodexCommand
 from tests.acp_runtime.fake_acp_agent import FakeAcpAgentProcess
+
+
+class RecordingPromptObserver(AcpPromptObserver):
+    def __init__(self, selected_option_id: str | None = None) -> None:
+        self.events = []
+        self.permissions = []
+        self.selected_option_id = selected_option_id
+
+    async def on_event(self, event):
+        self.events.append(event)
+
+    async def request_permission(self, request):
+        self.permissions.append(request)
+        return AcpPermissionOutcome(option_id=self.selected_option_id)
 
 
 @pytest.fixture
@@ -235,3 +254,100 @@ async def test_client_does_not_guess_an_unadvertised_authentication_method(
         await client.open(str(project))
 
     assert fake_agent.requests == ["initialize", "session/new", "process/exited"]
+
+
+@pytest.mark.anyio
+async def test_prompt_streams_only_safe_updates_and_returns_final_text(
+    tmp_path, project
+):
+    fake_agent = FakeAcpAgentProcess(
+        tmp_path / "acp-prompt-requests.txt",
+        prompt_result="All tests passed.",
+    )
+    observer = RecordingPromptObserver()
+    client = CodexAcpClient(command=fake_agent.command)
+    await client.open(str(project))
+
+    result = await client.prompt("Run the tests", observer)
+
+    assert result.stop_reason == "end_turn"
+    assert result.final_text == "All tests passed."
+    assert [(event.kind, event.label) for event in observer.events] == [
+        ("execute", "Running command")
+    ]
+    assert "private reasoning" not in repr(observer.events)
+    assert "SECRET=value" not in repr(observer.events)
+    await client.close()
+
+
+@pytest.mark.anyio
+async def test_prompt_maps_only_observer_selected_permission_option(
+    tmp_path, project
+):
+    fake_agent = FakeAcpAgentProcess(
+        tmp_path / "acp-permission-requests.txt",
+        prompt_result="Permission resolved.",
+        requests_permission=True,
+    )
+    observer = RecordingPromptObserver(selected_option_id="allow-once")
+    client = CodexAcpClient(command=fake_agent.command)
+    await client.open(str(project))
+
+    await client.prompt("Update the project", observer)
+
+    assert len(observer.permissions) == 1
+    assert observer.permissions[0].operation == "Run a command"
+    assert [option.kind for option in observer.permissions[0].options] == [
+        "allow_once",
+        "allow_always",
+        "reject_once",
+    ]
+    assert "permission/selected:allow-once" in fake_agent.requests
+    await client.close()
+
+
+@pytest.mark.anyio
+async def test_cancel_notifies_the_active_session_and_prompt_confirms_cancelled(
+    tmp_path, project
+):
+    fake_agent = FakeAcpAgentProcess(
+        tmp_path / "acp-cancel-requests.txt",
+        blocks_until_cancel=True,
+    )
+    observer = RecordingPromptObserver()
+    client = CodexAcpClient(command=fake_agent.command)
+    await client.open(str(project))
+    prompt = asyncio.create_task(client.prompt("Wait", observer))
+    for _ in range(100):
+        if "session/prompt" in fake_agent.requests:
+            break
+        await asyncio.sleep(0.01)
+
+    await client.cancel()
+    result = await prompt
+
+    assert result.stop_reason == "cancelled"
+    assert fake_agent.requests.count("session/cancel") == 1
+    await client.close()
+
+
+@pytest.mark.anyio
+async def test_concurrent_prompt_fails_closed(tmp_path, project):
+    fake_agent = FakeAcpAgentProcess(
+        tmp_path / "acp-concurrent-requests.txt",
+        blocks_until_cancel=True,
+    )
+    client = CodexAcpClient(command=fake_agent.command)
+    await client.open(str(project))
+    active = asyncio.create_task(client.prompt("First", RecordingPromptObserver()))
+    for _ in range(100):
+        if "session/prompt" in fake_agent.requests:
+            break
+        await asyncio.sleep(0.01)
+
+    with pytest.raises(RuntimeError, match="already active"):
+        await client.prompt("Second", RecordingPromptObserver())
+
+    await client.cancel()
+    await active
+    await client.close()
