@@ -17,6 +17,7 @@ const packageJson = JSON.parse(
 };
 const launcher = path.join(root, "scripts", "run-local-codex.sh");
 const supervisor = path.join(root, "scripts", "supervise-local.py");
+const ngrokOwner = path.join(root, "server/src/managed_ingress/ngrok.py");
 
 assert(
 	packageJson.scripts?.["dev:codex"] ===
@@ -25,6 +26,7 @@ assert(
 );
 assert(existsSync(launcher), "local launcher script should exist");
 assert(existsSync(supervisor), "local process supervisor should exist");
+assert(existsSync(ngrokOwner), "managed ngrok process owner should exist");
 
 const source = readFileSync(launcher, "utf8");
 assert(
@@ -34,6 +36,10 @@ assert(
 assert(
 	!source.includes("trap cleanup"),
 	"launcher should not retain competing shell signal ownership",
+);
+assert(
+	readFileSync(ngrokOwner, "utf8").includes("start_new_session=False"),
+	"ngrok must remain in the launcher process group for forced residual cleanup",
 );
 
 async function waitForPid(pathname: string): Promise<number> {

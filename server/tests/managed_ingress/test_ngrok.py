@@ -91,7 +91,7 @@ async def test_start_selects_clean_https_tunnel_without_a_shell():
         "--web-addr",
         "127.0.0.1:4041",
     )
-    assert commands[0][1]["start_new_session"] is True
+    assert commands[0][1]["start_new_session"] is False
     assert "secret" not in repr(status)
 
 

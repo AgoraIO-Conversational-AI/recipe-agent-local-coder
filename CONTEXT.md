@@ -61,3 +61,17 @@ optional safe inline content.
 
 The local coordinator that owns durable Work receipts, FIFO ACP execution,
 permission correlation, confirmed cancellation, and safe result persistence.
+
+## Managed MCP Ingress
+
+The dedicated loopback Streamable HTTP listener exposed temporarily through
+ngrok so Agora's Managed Voice LLM can call the local Task Runtime. It contains
+only the four production Work tools and is never mounted into lifecycle
+FastAPI.
+
+## Agent Capability
+
+One high-entropy, in-memory bearer bound to an exact active Agora Agent,
+Workspace Scope, and Workspace generation. It is a temporary development
+credential rather than the durable identity of Work and is revoked before the
+Agent stops.

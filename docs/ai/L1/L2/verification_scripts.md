@@ -6,7 +6,7 @@
 
 | Layer                    | Script / Tool                                | Bun target                | What it asserts                                              |
 | ------------------------ | -------------------------------------------- | ------------------------- | ------------------------------------------------------------ |
-| Python compile + unit    | `compileall` + validation + ACP + Task Runtime pytest | `bun run verify:backend`  | Python source compiles; validation and fake local-runtime behavior pass |
+| Python compile + unit    | `compileall` + validation + ACP + Task Runtime + Managed ingress pytest | `bun run verify:backend`  | Python source compiles; all fake backend boundaries pass |
 | Web → Rewrite contract   | `web/scripts/verify-api-contracts.ts`        | `bun run verify:web:api`  | No `app/api` routes; `/api/*` rewrites + fetch shapes correct |
 | Web → rewrite stub       | `web/scripts/verify-local-proxy.ts`          | `bun run verify:web:proxy`| Imports `next.config.ts`, resolves rewrites, fetches an in-process stub directly |
 | Web → FastAPI + FakeAgent| `web/scripts/verify-local-fastapi.ts`        | `bun run verify:local:fastapi` | Spawns FastAPI with `FakeAgent` patched in              |
@@ -64,11 +64,12 @@ What it does:
 
 This is the closest CI gets to a full integration test. It never makes outbound calls.
 
-## Python Compile, Validation, ACP, and Task Runtime Tests
+## Python Compile, Validation, ACP, Task Runtime, and Managed Ingress Tests
 
 `bun run verify:backend` compiles `server/src/` and runs the credential-free
 tests under `server/tests/architecture_validation/` and
-`server/tests/acp_runtime/` plus `server/tests/task_runtime/`. These suites cover:
+`server/tests/acp_runtime/`, `server/tests/task_runtime/`, and
+`server/tests/managed_ingress/`. These suites cover:
 
 - Workspace Scope persistence, existing-directory validation, and state changes.
 - Loopback-only workspace/readiness routes, picker cancellation, selection
@@ -90,6 +91,8 @@ tests under `server/tests/architecture_validation/` and
   time, one current-operation permission, and confirmed cancellation.
 - Workspace-switch rejection while Work or a permission is nonterminal, plus
   local lifespan startup and shutdown ordering.
+- Per-Agent bearer lifecycle, Workspace-generation binding, route isolation,
+  request guards, four safe tool projections, rate budgets, and fake ngrok.
 
 It catches:
 
@@ -119,7 +122,9 @@ What it does:
    Ctrl-C or a shortened test deadline returns `137` and removes
    signal-ignoring children. Normal root completion removes residual
    descendants.
-6. Proves `--workspace` and JSON-argv custom-command values reach children as
+6. Checks that ngrok remains in the supervisor-owned process group so residual
+   descendant cleanup also covers the tunnel.
+7. Proves `--workspace` and JSON-argv custom-command values reach children as
    opaque environment values, and unknown arguments fail closed.
 
 The injection variables and `LOCAL_LAUNCHER_GRACE_SECONDS` are test seams, not

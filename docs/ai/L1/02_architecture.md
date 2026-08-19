@@ -101,6 +101,8 @@ the quickstart conversation routes:
 Project Folder Settings gate -> /api/local/* -> /local/* -> WorkspaceService
   -> LocalRuntimeCoordinator -> CodexAcpClient child process -> ACP session
   -> TaskRuntime -> SQLite WorkStore -> one FIFO ACP prompt worker
+Managed Voice LLM -> ngrok HTTPS -> authenticated /mcp/
+  -> ManagedWorkTools -> TaskRuntime -> ACP session
 ```
 
 `WorkspaceService` persists one resolved primary directory. It is ACP context,
@@ -121,9 +123,17 @@ The opted-in local app also owns `TaskRuntime`. It durably accepts
 Workspace-scoped Work before execution, runs one ACP prompt at a time, stores
 only safe activity and bounded results, brokers one current-operation
 permission, confirms cancellation, and recovers interrupted Work as failed on
-restart. It starts and stops with the local FastAPI lifespan. No browser or MCP
-Work route is exposed yet, so the Managed Voice LLM cannot submit Work to this
-core in the current milestone.
+restart. It starts and stops with the local FastAPI lifespan. The browser has
+no Work route. Instead, an isolated public ASGI listener exposes exactly four
+authenticated MCP tools: `start_work`, `get_work_status`, `cancel_work`, and
+`respond_permission`.
+
+`ManagedIngressCoordinator` starts that listener and ngrok lazily during Agent
+preparation, then activates the capability only after Agora returns the real
+`agent_id`. Capabilities are bound to the current Workspace generation and
+Agent, kept only in memory, and revoked before Agent/tunnel shutdown. A tunnel
+URL change requires an Agent restart because the endpoint is part of the Agent
+configuration.
 
 ## Validation-only public boundary
 

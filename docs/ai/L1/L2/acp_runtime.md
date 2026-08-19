@@ -1,7 +1,7 @@
 # ACP Runtime
 
-> Local-only foundation for persisted Project Folder context, one ACP
-> child-process session, and safe readiness before an Agora conversation starts.
+> Local-only Project Folder, ACP session, Task Runtime, and authenticated
+> Managed Voice LLM ingress.
 
 ## Scope and Non-Scope
 
@@ -11,10 +11,10 @@ Runtime Core. The core implements durable Work receipts, serial ACP prompts,
 safe update/result mapping, one current-operation Permission Broker,
 cancellation, and restart recovery.
 
-It deliberately does not expose authenticated MCP Work tools, HTTP Work routes,
-SSE activity, an Activity Panel, voice result delivery, or transcript/history
-projection. The ordinary Managed Voice LLM conversation therefore does not yet
-delegate Work to ACP.
+It exposes authenticated MCP Work tools only through a dedicated public ASGI
+listener. It deliberately does not expose HTTP Work routes, SSE activity, an
+Activity Panel, proactive voice result delivery, or transcript/history
+projection. The Managed Voice LLM can delegate Work to ACP and poll status.
 
 Project Folder is the user-facing primary directory for ACP session context and
 relative paths. It is not a filesystem sandbox, access-control system, or
@@ -24,8 +24,9 @@ guarantee that an ACP child process cannot access other files.
 
 Run `bun run dev:codex`. The launcher runs dependency checks, starts FastAPI on
 `127.0.0.1:8000` and Next on `127.0.0.1:3000`, and terminates the sibling when
-either child exits. It starts neither an Agora conversation nor ngrok by itself.
-Before readiness it validates macOS Apple Silicon, Bun/Node/Python, and usable
+either child exits. It starts neither an Agora conversation nor ngrok until the
+user starts a conversation. Before readiness it validates macOS Apple Silicon,
+Bun/Node/Python/ngrok, and usable
 Agora configuration without printing secret values.
 
 The browser loads Workspace status before a conversation can start. If no valid
@@ -128,10 +129,26 @@ queued, running, cancelling, or permission-blocked Work failed after a restart,
 and stops Task Runtime before closing the ACP coordinator and SQLite store.
 Public app construction creates none of these local objects.
 
+## Managed MCP Ingress
+
+After ACP is ready, Agent preparation starts a dedicated loopback MCP listener
+and launcher-owned ngrok tunnel. The Managed LLM receives exactly four tools:
+`start_work`, `get_work_status`, `cancel_work`, and `respond_permission`.
+Authorization comes from one 256-bit, memory-only bearer bound to the actual
+Agora Agent and current Workspace generation. The capability is activated only
+after Agent creation succeeds and revoked before Agent or tunnel shutdown.
+
+The public app contains no lifecycle, settings, admin, docs, or OpenAPI routes.
+It authenticates before body reads, applies request-size and per-tool rate
+budgets, and returns only safe bounded projections. A tunnel URL change forces
+Agent restart. SSE/Activity Panel, Agora Speak, proactive announcements, and
+reconnect rehydration remain deferred.
+
 ## Verification Boundary
 
-`server/tests/acp_runtime/` and `server/tests/task_runtime/` use fake ACP
-clients/processes. Root verification also uses fake FastAPI and proxy targets.
+`server/tests/acp_runtime/`, `server/tests/task_runtime/`, and
+`server/tests/managed_ingress/` use fake ACP, Agent, listener, and ngrok
+boundaries. Root verification also uses fake FastAPI and proxy targets.
 These checks are offline-safe and verify contracts, prompt/update mapping,
 SQLite persistence, FIFO execution, permissions, cancellation, restart
 recovery, lifecycle sequencing, loopback guards, and UI build/type behavior.

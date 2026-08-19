@@ -54,6 +54,7 @@ production mode:
 | Local launcher/internal | `VOICE_ACP_LOCAL_RUNTIME`, `NEXT_PUBLIC_LOCAL_RUNTIME_ENABLED`, `VOICE_ACP_WORKSPACE` |
 | ACP child advanced     | `CODEX_PATH`, `CODEX_API_KEY`, `OPENAI_API_KEY` |
 | Compatible ACP command | `VOICE_ACP_COMMAND_JSON` (JSON argv array) |
+| Managed ingress ports  | `VOICE_ACP_MCP_PORT` (default `8001`), `VOICE_ACP_NGROK_API_PORT` (default `4041`) |
 
 `AGENT_BACKEND_URL` is a Next **server**-time env var (used inside `next.config.ts`), not a `NEXT_PUBLIC_*` value — do not prefix it.
 
@@ -98,9 +99,12 @@ returns a receipt immediately, executes one ACP prompt at a time, records safe
 activity, correlates one pending permission, and supports confirmed
 cancellation. `application.state.work_store` owns the SQLite receipt database.
 
-There is intentionally no `/local/work`, `/api/local/work`, MCP Work tool, SSE,
-or Activity Panel contract in this milestone. Those are the next integration
-boundary; callers must not treat the internal service as a public HTTP API.
+There is intentionally no `/local/work`, `/api/local/work`, SSE, or Activity
+Panel contract. The production public boundary is a separate `/mcp/` listener
+with exactly `start_work`, `get_work_status`, `cancel_work`, and
+`respond_permission`. It requires the in-memory bearer created for the current
+Agent and Workspace generation; caller-supplied identifiers are not accepted
+as tool authority.
 
 ## Token Shape
 
@@ -173,7 +177,10 @@ agent_id = await session.start()
 
 ## Related Deep Dives
 
-The separate validation public app exposes authenticated Streamable HTTP at `/mcp/` with exactly four tools: `start_work`, `get_work_status`, `cancel_work`, and `respond_permission`. Session identity is derived from a runner-issued bearer and is never accepted as a model-provided tool argument. The public app does not expose any route in the table above.
+The separate validation public app exposes a synthetic version of the same
+four-tool shape for evidence collection. The production local app uses
+`server/src/managed_ingress/` and delegates to the real Task Runtime; neither
+public app exposes a lifecycle route from the table above.
 
 - [Managed Agent Config](L2/managed_agent_config.md) — Detailed field reference.
 - [Verification Scripts](L2/verification_scripts.md) — How the contracts above are enforced by local pre-ship checks.

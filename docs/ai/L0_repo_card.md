@@ -1,6 +1,6 @@
 # recipe-agent-acp-local (python) — Repo Card
 
-> Next.js web client + Python FastAPI backend for an Agora Conversational AI voice agent, with an optional isolated Managed Voice LLM evidence surface.
+> Next.js web client + Python FastAPI backend for an Agora Conversational AI voice agent, with a local Codex ACP runtime and authenticated Managed Voice LLM MCP ingress.
 
 ## Identity
 
@@ -38,5 +38,7 @@ This repository also carries a local-only Codex foundation for a downstream
 voice-to-work derivative. Its asynchronous Project Folder picker, supervised
 local process lifecycle, ACP lifecycle, SQLite-backed Task Runtime Core, and
 `/api/local/*` routes are extension contracts, not part of the reusable
-three-route quickstart baseline. MCP Work ingress, SSE/UI, Speak, and ngrok
-integration remain deferred. See [ACP Runtime](L1/L2/acp_runtime.md).
+three-route quickstart baseline. The derivative owns an isolated four-tool MCP
+listener and a launcher-owned ngrok tunnel bound to one Agent capability.
+SSE/UI, Agora Speak, proactive completion announcements, and reconnect
+rehydration remain deferred. See [ACP Runtime](L1/L2/acp_runtime.md).

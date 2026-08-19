@@ -79,6 +79,15 @@ server/                   # Python FastAPI backend
       permissions.py      # one current-operation Permission Broker
       runtime.py          # serial FIFO ACP execution and workspace guard
       safety.py           # credential-pattern redaction before SQLite writes
+    managed_ingress/
+      models.py           # capability and Agent lease value objects
+      capabilities.py     # bearer binding and rate budgets
+      tools.py            # four safe Task Runtime projections
+      http_policy.py      # auth, host/origin, size, and handler guards
+      mcp_app.py          # production four-tool FastMCP surface
+      public_server.py    # isolated public ASGI app
+      ngrok.py            # launcher-owned ngrok subprocess boundary
+      runtime.py          # listener, tunnel, and capability lifecycle
     architecture_validation/
       admin.py            # Loopback-only state seeding
       config.py           # Fail-closed Managed-path evidence controls
@@ -117,6 +126,7 @@ scripts/
 | `server/src/agent.py`                               | `Agent` class — vendor chain + async session lifecycle.                  |
 | `server/src/acp_runtime/`                           | Local Codex derivative: workspace persistence, ACP, and readiness.      |
 | `server/src/task_runtime/`                          | Durable Work, FIFO ACP execution, permissions, cancellation, recovery. |
+| `server/src/managed_ingress/`                       | Isolated MCP, per-Agent capability, ngrok, and ingress lifecycle.      |
 | `server/src/architecture_validation/`               | Managed Voice LLM evidence state, tools, and isolated public ingress.    |
 | `server/scripts/run_fake_server.py`                 | Patches `server.agent` to `FakeAgent` for verification.                  |
 
@@ -132,7 +142,9 @@ scripts/
 - **No `web/src/hooks/`** and **no `useAgoraConnection.ts`** — RTC/RTM orchestration lives in `LandingPage.tsx` and `ConversationComponent.tsx`.
 - **No `pyproject.toml`** — Python deps are pip + `requirements.txt`.
 - **`server/tests/architecture_validation/`** — pytest coverage for Managed-path context, tools, and route isolation; ordinary backend routes still use the bun-spawned smoke scripts.
-- **`server/tests/acp_runtime/`** and **`server/tests/task_runtime/`** — offline fake-ACP coverage for local readiness, protocol mapping, durable Work, permissions, cancellation, and recovery.
+- **`server/tests/acp_runtime/`**, **`server/tests/task_runtime/`**, and
+  **`server/tests/managed_ingress/`** — offline coverage for readiness, durable
+  Work, permissions, route isolation, capabilities, and fake ngrok lifecycle.
 - **No `Makefile`** — `bun run …` is the canonical entry point.
 - **No `app/api/**/route.ts`** under `web/` — `verify-api-contracts.ts` enforces this.
 

@@ -94,7 +94,7 @@ class NgrokCliTunnel:
                 *argv,
                 stdout=subprocess.DEVNULL,
                 stderr=subprocess.DEVNULL,
-                start_new_session=True,
+                start_new_session=False,
             )
         except Exception as exc:
             raise NgrokTunnelError("ngrok_tunnel_unavailable") from exc

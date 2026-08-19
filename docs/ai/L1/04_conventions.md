@@ -7,7 +7,7 @@
 | Concern        | Toolchain                                                                              |
 | -------------- | -------------------------------------------------------------------------------------- |
 | Python format  | None enforced in-repo. Match existing style; `ruff`/`black` are not configured.        |
-| Python verify  | Compile `server/src/` and run validation, ACP, and Task Runtime pytest (`bun run verify:backend`). |
+| Python verify  | Compile `server/src/` and run validation, ACP, Task Runtime, and Managed ingress pytest (`bun run verify:backend`). |
 | Python deps    | `pip install -r server/requirements.txt` inside `server/venv` (created by `bun run setup:backend`). |
 | TypeScript     | `strict: true` in `web/tsconfig.json`; path alias `@/* → ./src/*`.                     |
 | Linter         | Biome (`web/biome.json`); `noExplicitAny` off, `useExhaustiveDependencies` off.        |
@@ -79,10 +79,16 @@ There is **no ESLint config file** in `web/` — Biome is the only TS/JS linter.
 - `PermissionBroker` holds at most one current-operation request. Select only
   `allow_once` or `reject_once`; cancellation is the fallback when a matching
   option is unavailable.
+- Keep production MCP on its dedicated ASGI listener; never mount it into the
+  lifecycle FastAPI app. Expose only the four safe Work tools.
+- Bind one in-memory bearer to the exact Agent and Workspace generation, and
+  revoke it before Agent or tunnel shutdown.
+- Keep ngrok in the launcher supervisor's process group so abnormal launcher
+  cleanup cannot leave a public tunnel behind.
 
 ## Testing
 
-- Python: `bun run verify:backend` compiles the backend and runs the Managed-path validation, ACP runtime, and Task Runtime pytest suites; ordinary backend route coverage still comes from the smoke scripts.
+- Python: `bun run verify:backend` compiles the backend and runs the Managed-path validation, ACP runtime, Task Runtime, and Managed ingress pytest suites; ordinary backend route coverage still comes from the smoke scripts.
 - TS: no Vitest harness. The verification suite layers Python compile/tests,
   Bun unit tests, API contracts, the rewrite stub, FakeAgent FastAPI smoke,
   launcher integration, local-preflight tests, and the production web build.
@@ -93,6 +99,8 @@ There is **no ESLint config file** in `web/` — Biome is the only TS/JS linter.
 - Task Runtime tests under `server/tests/task_runtime/` use fake ACP only and
   cover SQLite receipts, FIFO execution, permissions, cancellation, recovery,
   and Workspace switch protection without starting Agora.
+- Managed ingress tests under `server/tests/managed_ingress/` use fake Agent,
+  listener, Task Runtime, and ngrok boundaries; they never open a public tunnel.
 
 ## File Naming
 

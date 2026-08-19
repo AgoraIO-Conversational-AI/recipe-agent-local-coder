@@ -73,9 +73,22 @@ backend-neutral Final Presentation, and blocks Project Folder changes while
 Work or a permission is nonterminal. Shutdown stops Task Runtime before closing
 the ACP session and SQLite connection.
 
-No HTTP or MCP Work-control route is mounted by this slice. The managed Agent
-cannot submit real coding Work yet; authenticated MCP ingress, SSE/UI, Agora
-Speak delivery, and ngrok orchestration are separate follow-ons.
+The opted-in local app also owns a second, dedicated loopback ASGI listener:
+
+```text
+Managed Voice LLM -> ngrok HTTPS -> bearer-authenticated /mcp/
+  -> ManagedWorkTools -> TaskRuntime -> codex-acp stdio
+```
+
+Each active Agora Agent receives one in-memory bearer bound to its exact Agent
+ID, Workspace ID, and Workspace generation. Agent stop revokes it first. The
+MCP listener exposes only four Work tools and is never mounted into the
+lifecycle FastAPI app. ngrok starts lazily when an Agent is prepared after ACP
+readiness and remains in the launcher's process group for forced cleanup.
+
+SSE/UI, proactive permission/result announcements, and Agora Speak delivery
+remain separate follow-ons. Status grounding is available through MCP, but
+completion is not pushed into the conversation yet.
 
 ## Shared Conversation Flow
 

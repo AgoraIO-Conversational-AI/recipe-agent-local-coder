@@ -26,13 +26,13 @@ routes, and safe failure states. They do not prove a real `npx` download or
 Codex launch, ChatGPT browser authentication, macOS picker behavior, Agora
 conversation start, or ngrok. Treat each as an authorized manual/live check.
 
-## Codex Ready Does Not Mean Voice-to-ACP Is Connected
+## ACP Ready Does Not Mean the Agent Ingress Is Ready
 
 `LocalRuntimeStatus.state == "ready"` proves only that one ACP session is open.
-The Task Runtime Core can execute Work internally, but the Managed Voice LLM
-does not yet have an authenticated MCP Work ingress, so an ordinary voice
-conversation remains the standard managed assistant and will not delegate to
-Codex.
+The MCP listener, ngrok tunnel, and capability are prepared when the user
+starts the Agora conversation. If the tunnel URL changes, the Agent must be
+restarted because its MCP endpoint cannot be updated in place. Completed Work
+is pollable through `get_work_status`; it is not announced proactively yet.
 
 ## Local Runtime Overrides Are Explicit and Narrow
 

@@ -41,7 +41,7 @@ After editing, run `bun run verify:backend && bun run verify:web:api`.
 ```bash
 bun run doctor              # quick gate
 bun run doctor:local        # adds python3 + env checks
-bun run verify:backend      # Python compile + validation, ACP, and Task Runtime pytest
+bun run verify:backend      # Python compile + all offline backend suites
 bun run verify:web:api      # contract harness on the rewrite shape
 bun run verify:web:proxy    # static fake-server smoke
 bun run verify:local:fastapi # spawns FakeAgent inside FastAPI
@@ -80,12 +80,13 @@ activate ACP explicitly after ordinary FastAPI startup completes. Normal/public
 Next deployments do not register `/api/local/*` rewrites.
 
 The opted-in local FastAPI lifespan starts the Task Runtime, marks interrupted
-nonterminal Work failed, and stops it before ACP and SQLite shutdown. This does
-not start an ACP prompt by itself. The current web flow has no Work submission
-or activity route, and the Managed Voice LLM is not connected to Task Runtime
-until the authenticated MCP ingress milestone.
+nonterminal Work failed, and stops it before ACP and SQLite shutdown. After ACP
+is ready, **Start conversation** prepares the isolated four-tool MCP listener,
+starts ngrok, and binds one capability to the Agora Agent. Work completion is
+available through `get_work_status`; proactive result speech and an Activity
+Panel are not part of this milestone.
 
-The launcher preflight validates macOS Apple Silicon, Bun/Node/Python, and
+The launcher preflight validates macOS Apple Silicon, Bun/Node/Python/ngrok, and
 usable Agora configuration without printing secrets. Advanced examples:
 
 ```bash
@@ -99,7 +100,7 @@ authentication inputs. None of these paths bypasses Workspace validation or
 changes `INITIAL_AGENT_MODE=agent`.
 
 The real `npx` package execution, ChatGPT browser authentication, native picker,
-Agora conversation, and ngrok remain manual/live checks.
+Agora conversation, and public ngrok reachability remain manual/live checks.
 
 ## Token Renewal
 

@@ -10,14 +10,14 @@ const validEnv = [
 const validRuntime = {
   platform: 'darwin',
   arch: 'arm64',
-  availableCommands: new Set(['bun', 'node', 'python3']),
+  availableCommands: new Set(['bun', 'node', 'python3', 'ngrok']),
   envFileContents: validEnv,
 }
 
 test('preflight accepts the certified platform, runtimes, and usable Agora config', () => {
   expect(validateLocalCodexPreflight(validRuntime)).toEqual([
     'macOS Apple Silicon available',
-    'bun, node, and python3 available',
+    'bun, node, python3, and ngrok available',
     'Agora App ID and App Certificate configured',
   ])
 })
@@ -38,6 +38,13 @@ test('preflight reports missing runtimes without invoking them', () => {
       availableCommands: new Set(['bun', 'python3']),
     }),
   ).toThrow('Missing required local runtime: node')
+
+  expect(() =>
+    validateLocalCodexPreflight({
+      ...validRuntime,
+      availableCommands: new Set(['bun', 'node', 'python3']),
+    }),
+  ).toThrow('Missing required local runtime: ngrok')
 })
 
 test('preflight rejects placeholders and never includes secret values', () => {

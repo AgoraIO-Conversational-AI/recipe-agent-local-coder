@@ -7,6 +7,7 @@
 - **Python** ≥ 3.10 (README + `server/README.md`).
 - **bun** as the JS toolchain (root `package.json` scripts and root `bun.lock`).
 - **pip** + `venv` for Python dependencies. No `pyproject.toml` is present.
+- **ngrok** installed and authenticated once with `ngrok config add-authtoken ...`.
 - Agora project with App ID + App Certificate.
 
 ## Install
@@ -63,6 +64,8 @@ AGENT_BACKEND_URL=http://localhost:8000
 | `CODEX_PATH`             | ACP child            | No       | Advanced Codex binary override passed only to the child.               |
 | `CODEX_API_KEY` / `OPENAI_API_KEY` | ACP child | No | Advanced auth pass-through; values are never logged.                   |
 | `VOICE_ACP_COMMAND_JSON` | Python (local Codex) | No       | Advanced JSON argv array; never parsed by a shell.                     |
+| `VOICE_ACP_MCP_PORT`     | Python (local Codex) | No       | Dedicated loopback MCP listener; default `8001`.                       |
+| `VOICE_ACP_NGROK_API_PORT` | Python (local Codex) | No     | Local ngrok inspection API; default `4041`.                            |
 
 The optional Managed-path evidence harness additionally uses `VALIDATION_MODEL` and `PUBLIC_VALIDATION_BASE_URL`. It calls `update` and `say` through the authenticated Agent session and needs no separate model-provider credentials. The runner creates MCP capabilities in memory; do not add static capability tokens to `.env.local`.
 
@@ -77,6 +80,7 @@ requests>=2.31.0
 python-dotenv>=1.0.0
 agora-agents>=2.0.0
 mcp>=1.2.0,<2
+httpx>=0.27,<1
 ```
 
 The SDK is lower-bounded at v2 — add an upper bound or exact pin if you need reproducible SDK behavior.
@@ -90,11 +94,11 @@ bun run dev:backend            # python3 server/src/server.py
 bun run dev:frontend           # cd web && AGENT_BACKEND_URL=http://localhost:8000 bun run dev
 bun run doctor                 # bun + node_modules sanity
 bun run doctor:local           # adds python3 + .env.local + AGORA_* presence
-bun run preflight:codex        # certified platform/runtime/Agora config, no secret output
+bun run preflight:codex        # platform/Bun/Node/Python/ngrok/Agora config, no secret output
 bun run build                  # bun --filter web build
 bun run verify                 # doctor + verify:web:api + verify:web:build
 bun run verify:local           # doctor:local + verify:backend + verify:local:fastapi + verify:web:proxy + verify:web:build
-bun run verify:backend         # compile server/src and run validation, ACP, and Task Runtime pytest
+bun run verify:backend         # compile server/src and run all offline Python suites
 bun run verify:web:api         # web/scripts/verify-api-contracts.ts
 bun run verify:web:proxy       # web/scripts/verify-local-proxy.ts
 bun run verify:local:fastapi   # spawns server/scripts/run_fake_server.py
@@ -121,10 +125,10 @@ group. Terminal closure is handled as SIGHUP cleanup. Interrupted statuses are
 | `bun run verify:web:api`      | No          | Contract harness with mocked SDK                     |
 | `bun run verify:web:proxy`    | No          | Static fake-server smoke                             |
 | `bun run verify:local:fastapi`| No          | Boots `server/scripts/run_fake_server.py`            |
-| `bun run verify:backend`      | No          | Compile server sources + validation, ACP, and Task Runtime pytest |
+| `bun run verify:backend`      | No          | Compile sources + validation, ACP, Task Runtime, and Managed ingress pytest |
 | `bun run verify:web:build`    | No          | `bun --filter web build`                             |
 | `bun run dev`                 | Yes (for use) | Port binding blocked in many sandboxes              |
-| `bun run dev:codex`           | No (until Start conversation) | Starts local services; no Agora call or ngrok by itself |
+| `bun run dev:codex`           | No (until Start conversation) | Starts local services; Agent preparation then starts ngrok |
 | `cd server && ... pytest -q`  | No          | ACP tests inject fakes; no real `npx` or browser auth |
 
 ## Local Codex Setup
@@ -147,11 +151,17 @@ override. `CODEX_PATH`, `CODEX_API_KEY`, and `OPENAI_API_KEY` are advanced child
 pass-through values. `--acp-command-json '["agent","--stdio"]'` supplies a
 Compatible custom command without shell parsing. None selects full access.
 Offline checks cannot verify package download, browser sign-in, native picker,
-Agora conversation, or ngrok.
+Agora conversation, real ngrok reachability, or end-to-end Managed LLM tool use.
+
+After ACP is ready, **Start conversation** starts the dedicated MCP listener
+and ngrok, issues one in-memory capability for the new Agora Agent, and injects
+exactly four Work tools. Ending the Agent or launcher revokes the capability
+and closes the tunnel.
 
 ## Common Setup Failures
 
 - `bun run doctor:local` fails on **"python3 not found"** → install Python ≥ 3.10.
+- Preflight reports a missing ngrok runtime → install ngrok and authenticate it once.
 - Doctor fails on missing `server/.env.local` → run `bun run setup:env` or copy from `server/.env.example`.
 - `cd web && bun run doctor` rejects empty/invalid `AGENT_BACKEND_URL` → ensure the URL is `http://` or `https://`.
 - `verify:web:api` fails on a new route → extend `web/scripts/verify-api-contracts.ts` to cover it.

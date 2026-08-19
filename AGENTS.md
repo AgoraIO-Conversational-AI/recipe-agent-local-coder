@@ -46,7 +46,7 @@ The sections below (Start Here, Patterns, Anti-Patterns, etc.) remain the canoni
   `concurrently` responsible for sibling lifecycle and labeled output, and
   force-cleans the isolated process group after a deliberate second Ctrl-C or
   10 seconds. SIGHUP also cleans descendants when the terminal closes.
-- Its preflight requires macOS Apple Silicon, Bun/Node/Python, and usable Agora
+- Its preflight requires macOS Apple Silicon, Bun/Node/Python/ngrok, and usable Agora
   credentials without printing their values.
 - The browser automatically opens the Project Folder Settings gate until an
   existing directory is selected and the local runtime reports `ready`.
@@ -63,8 +63,11 @@ The sections below (Start Here, Patterns, Anti-Patterns, etc.) remain the canoni
 - The opted-in local app owns one SQLite-backed Task Runtime Core. It persists
   Work before FIFO execution, maps safe ACP activity, correlates one
   current-operation permission, confirms cancellation, and fails interrupted
-  Work on restart. It exposes no Work route yet; MCP, SSE/UI, Speak, and ngrok
-  integration remain deferred.
+  Work on restart.
+- The local app owns a separate bearer-authenticated MCP listener. ngrok maps
+  only that listener and starts lazily for a Work-capable Agent after ACP is
+  ready. Exactly four tools call the real Task Runtime; Agent stop revokes its
+  capability before stopping the session. Never mount this app into FastAPI.
 - `CodexAcpClient` owns its child process and defaults to
   `npx -y @agentclientprotocol/codex-acp@1.1.7` with `INITIAL_AGENT_MODE=agent`.
   It tries reusable authentication first, then uses an advertised ChatGPT method
@@ -72,8 +75,8 @@ The sections below (Start Here, Patterns, Anti-Patterns, etc.) remain the canoni
   `CODEX_PATH`, API-key pass-through, and JSON-argv custom commands never change
   the default mode or log child environments.
 - `bun run dev:codex` does not start an Agora conversation until the user starts
-  one and never starts ngrok. Do not infer live Codex or Agora acceptance from
-  offline checks.
+  one. Agent preparation starts ngrok; tests use fakes and never do. Do not
+  infer live Codex, ngrok, or Agora acceptance from offline checks.
 
 ### Managed Voice LLM Evidence Harness
 
@@ -109,6 +112,8 @@ The sections below (Start Here, Patterns, Anti-Patterns, etc.) remain the canoni
   ACP child-process client, and local readiness coordinator.
 - `server/src/task_runtime/`: Work domain, SQLite store, Permission Broker, and
   serial background ACP coordinator.
+- `server/src/managed_ingress/`: production capabilities, safe Work tools,
+  isolated MCP app, ngrok owner, and Agent-bound lifecycle coordinator.
 
 ## Patterns
 

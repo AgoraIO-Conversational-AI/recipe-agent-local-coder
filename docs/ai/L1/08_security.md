@@ -123,8 +123,13 @@ If you need real auth, add a FastAPI dependency that validates a header on each 
   persisted in a mode-`0600` SQLite file under a mode-`0700` state directory.
   Raw ACP frames, thought content, authentication data, child environments,
   and private protocol identifiers are not stored.
-- No HTTP or MCP Work/permission route is exposed yet. The future voice ingress
-  must authenticate session capabilities before it can call Task Runtime.
+- No lifecycle HTTP Work/permission route is exposed. The dedicated public MCP
+  app exposes only four tools, authenticates before reading request bodies,
+  enforces Host/Origin/method/content-type policy and a 64 KiB pre-read cap,
+  and derives Agent/Workspace authority from a memory-only bearer.
+- Capabilities are generation-bound, rate-limited per tool, and revoked before
+  Agent or tunnel shutdown. Tool projections omit filesystem paths, internal
+  identifiers, raw ACP frames, and unbounded results.
 - Reusable credentials are tried before authentication. Only a typed
   authentication-required response may invoke the advertised ChatGPT method and
   one retry. `CODEX_PATH`, `CODEX_API_KEY`, and `OPENAI_API_KEY` are explicit
@@ -134,6 +139,8 @@ If you need real auth, add a FastAPI dependency that validates a header on each 
 ## Managed-path evidence boundary
 
 - ngrok maps only the dedicated public ASGI listener, never the lifecycle FastAPI port.
+- ngrok remains in the launcher process group so supervisor cleanup also owns
+  the public tunnel; tests substitute a fake CLI and never expose a port.
 - MCP requests require a per-session, 256-bit runner-issued capability held only in memory.
 - Model-provided tool arguments cannot select a session.
 - Loopback seed controls verify the socket peer, reject cross-site `Origin`/`Host`

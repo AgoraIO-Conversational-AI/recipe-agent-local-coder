@@ -85,11 +85,21 @@ through one FIFO worker, stores bounded activity and final text, correlates one
 current-operation permission, confirms cancellation, and fails interrupted
 Work safely after restart.
 
-The core is not connected to the Managed Voice LLM yet. Production MCP Work
-tools, SSE activity, the read-only task panel, Agora Speak result delivery, and
-ngrok launcher integration remain follow-on slices. Until those are complete,
-**Start conversation** still starts the ordinary managed voice assistant and
-does not delegate coding Work to Task Runtime.
+The local app now connects that core to Agora's Managed Voice LLM through an
+authenticated, launcher-owned ngrok MCP ingress. **Start conversation** prepares
+the dedicated MCP listener, starts ngrok after ACP is ready, issues one
+per-Agent bearer, and injects exactly four Work tools. ngrok exposes only the
+MCP listener; ACP remains local stdio.
+
+Install ngrok and complete `ngrok config add-authtoken ...` once before the
+first run. The bearer, full MCP configuration, Workspace path, and internal ACP
+identifiers are never returned to the browser or persisted. Ending the Agent or
+launcher revokes the bearer before stopping the tunnel.
+
+SSE activity, the read-only task panel, proactive permission/result
+announcements, and Agora Speak result delivery remain follow-on slices. Until
+those exist, ask the voice Agent for task status to retrieve progress, a pending
+permission, or a completed result; completion is not announced automatically.
 
 On first launch, the app opens a blocking **Project Folder** Settings gate.
 Choose an existing folder with the native macOS picker (or use the advanced
@@ -201,7 +211,7 @@ bun run verify
 
 Run `bun run verify` before shipping web-only changes, and `bun run verify:local` when backend behavior changed.
 
-Offline checks use fake ACP clients/processes and fake FastAPI/proxy paths; they
+Offline checks use fake ACP, ngrok, Agent, and FastAPI/proxy paths; they
 do not execute the pinned `npx` command, authenticate in a browser, open the
 native picker, start an Agora conversation, or open ngrok. Those are live/manual
 checks. Tests run standalone: `pytest` in `server/`, `bun test` in `web/`. CI

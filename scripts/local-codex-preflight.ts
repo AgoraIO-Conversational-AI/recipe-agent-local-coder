@@ -29,8 +29,13 @@ export function validateLocalCodexPreflight(input: LocalCodexPreflightInput): st
     throw new Error('Local Codex runtime requires Apple Silicon')
   }
 
-  for (const command of ['bun', 'node', 'python3']) {
+  for (const command of ['bun', 'node', 'python3', 'ngrok']) {
     if (!input.availableCommands.has(command)) {
+      if (command === 'ngrok') {
+        throw new Error(
+          'Missing required local runtime: ngrok. Install ngrok and run `ngrok config add-authtoken ...` once.',
+        )
+      }
       throw new Error(`Missing required local runtime: ${command}`)
     }
   }
@@ -44,7 +49,7 @@ export function validateLocalCodexPreflight(input: LocalCodexPreflightInput): st
 
   return [
     'macOS Apple Silicon available',
-    'bun, node, and python3 available',
+    'bun, node, python3, and ngrok available',
     'Agora App ID and App Certificate configured',
   ]
 }
@@ -52,7 +57,9 @@ export function validateLocalCodexPreflight(input: LocalCodexPreflightInput): st
 if (import.meta.main) {
   try {
     const envPath = path.join(process.cwd(), 'server', '.env.local')
-    const availableCommands = new Set(['bun', 'node', 'python3'].filter((command) => Bun.which(command) !== null))
+    const availableCommands = new Set(
+      ['bun', 'node', 'python3', 'ngrok'].filter((command) => Bun.which(command) !== null),
+    )
     const messages = validateLocalCodexPreflight({
       platform: process.platform,
       arch: process.arch,

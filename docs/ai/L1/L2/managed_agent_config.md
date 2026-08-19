@@ -6,6 +6,12 @@
 
 All managed agent configuration is in `server/src/agent.py`. The browser sends `{ channelName, rtcUid, userUid }` to `POST /startAgent`, which the FastAPI handler forwards to `agent.start(...)`. That method builds an SDK-driven agent and creates an async session.
 
+The stable quickstart path uses only the managed provider configuration below.
+The opted-in local app injects a production Work bridge: Agent preparation
+starts the isolated MCP/ngrok ingress and adds exactly four Task Runtime tools.
+The optional architecture-validation runner instead injects its synthetic
+evidence configuration. These modes are mutually exclusive.
+
 ## The Agent Builder Chain
 
 `AsyncAgora` is constructed once at `Agent.__init__` time and held as `self.client`. All provider options (`turn_detection`, `advanced_features`, `parameters`) live on `AgoraAgent`, not on `create_async_session`.
@@ -138,7 +144,8 @@ Stop is idempotent: `Agent.stop` tries `session.stop()` on the in-memory session
 ## Verification
 
 `bun run verify:backend` compiles server source and runs the credential-free
-architecture-validation, ACP runtime, and Task Runtime tests, but it does not
+architecture-validation, ACP runtime, Task Runtime, and Managed ingress tests,
+but it does not
 call live Agora. `bun run verify:local:fastapi` runs the FastAPI app with
 `FakeAgent` patched in to ensure routes match expected shapes without touching
 the real Agora cloud.
