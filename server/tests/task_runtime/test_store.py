@@ -64,6 +64,37 @@ def test_persisted_text_redacts_common_credentials(store):
     assert "[REDACTED]" in stored.objective
 
 
+def test_persisted_text_redacts_unlabelled_provider_and_pem_credentials(store):
+    github_token = "ghp_1234567890abcdefghijklmnop"
+    aws_key = "AKIA1234567890ABCDEF"
+    jwt = "eyJabcdefghijk.abcdefghijkl.abcdefghijk"
+    pem = "-----BEGIN PRIVATE KEY-----\nprivate-data\n-----END PRIVATE KEY-----"
+    receipt, _ = store.create_or_get(
+        "scope-a",
+        "turn-provider-secret",
+        (
+            f"Use {github_token} {aws_key} {jwt} "
+            "https://person:password@example.com and PATH=/private/bin"
+        ),
+    )
+    store.transition(receipt.work_id, "starting")
+    store.transition(receipt.work_id, "running")
+    store.save_final(
+        receipt.work_id,
+        FinalPresentation(speech="Credential removed", inline=pem),
+    )
+
+    stored = store.get(receipt.work_id)
+    serialized = (
+        stored.objective
+        + stored.final_presentation.speech
+        + stored.final_presentation.inline
+    )
+    for secret in (github_token, aws_key, jwt, "person:password", "private-data"):
+        assert secret not in serialized
+    assert "PATH=[REDACTED]" in stored.objective
+
+
 def test_transition_persists_activity_permission_and_final_result(store):
     receipt, _ = store.create_or_get("scope-a", "turn-1", "Run tests")
 
