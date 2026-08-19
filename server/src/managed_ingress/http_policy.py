@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 from contextvars import ContextVar
+from typing import Protocol
 from urllib.parse import urlparse
 
 from .capabilities import CapabilityRegistry
@@ -73,6 +74,12 @@ def _hostname(value: str) -> str:
     return candidate
 
 
+class HandlerTracker(Protocol):
+    def try_enter(self) -> bool: ...
+
+    def leave(self) -> None: ...
+
+
 class McpIngressMiddleware:
     """Authenticate and bound MCP requests before protocol parsing."""
 
@@ -82,10 +89,12 @@ class McpIngressMiddleware:
         *,
         registry: CapabilityRegistry,
         host_policy: IngressHostPolicy,
+        handler_tracker: HandlerTracker | None = None,
     ) -> None:
         self._app = app
         self._registry = registry
         self._host_policy = host_policy
+        self._handler_tracker = handler_tracker
 
     async def __call__(self, scope, receive, send) -> None:
         if scope["type"] != "http":
@@ -116,50 +125,57 @@ class McpIngressMiddleware:
         if not self._host_policy.allows_origin(origin):
             await _respond(send, 403, "invalid_origin")
             return
-
-        replay_receive = receive
-        if method == "POST":
-            content_type = headers.get(b"content-type", b"").decode(
-                "latin-1", errors="ignore"
-            )
-            if content_type.split(";", 1)[0].strip().casefold() != "application/json":
-                await _respond(send, 415, "unsupported_content_type")
-                return
-            content_length = headers.get(b"content-length", b"").decode(
-                "ascii", errors="ignore"
-            )
-            if content_length.isdigit() and int(content_length) > MAX_MCP_REQUEST_BYTES:
-                await _respond(send, 413, "request_too_large")
-                return
-            body = bytearray()
-            more_body = True
-            while more_body:
-                message = await receive()
-                if message.get("type") != "http.request":
-                    continue
-                body.extend(message.get("body", b""))
-                if len(body) > MAX_MCP_REQUEST_BYTES:
+        entered = self._handler_tracker is None or self._handler_tracker.try_enter()
+        if not entered:
+            await _respond(send, 503, "runtime_unavailable")
+            return
+        try:
+            replay_receive = receive
+            if method == "POST":
+                content_type = headers.get(b"content-type", b"").decode(
+                    "latin-1", errors="ignore"
+                )
+                if content_type.split(";", 1)[0].strip().casefold() != "application/json":
+                    await _respond(send, 415, "unsupported_content_type")
+                    return
+                content_length = headers.get(b"content-length", b"").decode(
+                    "ascii", errors="ignore"
+                )
+                if content_length.isdigit() and int(content_length) > MAX_MCP_REQUEST_BYTES:
                     await _respond(send, 413, "request_too_large")
                     return
-                more_body = bool(message.get("more_body", False))
-            delivered = False
+                body = bytearray()
+                more_body = True
+                while more_body:
+                    message = await receive()
+                    if message.get("type") != "http.request":
+                        continue
+                    body.extend(message.get("body", b""))
+                    if len(body) > MAX_MCP_REQUEST_BYTES:
+                        await _respond(send, 413, "request_too_large")
+                        return
+                    more_body = bool(message.get("more_body", False))
+                delivered = False
 
-            async def replay_receive():
-                nonlocal delivered
-                if not delivered:
-                    delivered = True
-                    return {
-                        "type": "http.request",
-                        "body": bytes(body),
-                        "more_body": False,
-                    }
-                return {"type": "http.disconnect"}
+                async def replay_receive():
+                    nonlocal delivered
+                    if not delivered:
+                        delivered = True
+                        return {
+                            "type": "http.request",
+                            "body": bytes(body),
+                            "more_body": False,
+                        }
+                    return {"type": "http.disconnect"}
 
-        token = _current_binding.set(binding)
-        try:
-            await self._app(scope, replay_receive, send)
+            token = _current_binding.set(binding)
+            try:
+                await self._app(scope, replay_receive, send)
+            finally:
+                _current_binding.reset(token)
         finally:
-            _current_binding.reset(token)
+            if self._handler_tracker is not None:
+                self._handler_tracker.leave()
 
 
 async def _respond(send, status: int, code: str, *, bearer: bool = False) -> None:

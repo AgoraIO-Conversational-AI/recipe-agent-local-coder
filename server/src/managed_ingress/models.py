@@ -23,3 +23,12 @@ class CapabilityBinding:
     workspace_generation: int
     agora_agent_id: str
     issued_at: float
+
+
+@dataclass(frozen=True)
+class VoiceMcpLease:
+    """The narrow MCP configuration handed to one pending Agora Agent."""
+
+    endpoint: str
+    authorization: str = field(repr=False)
+    lease_id: str = ""

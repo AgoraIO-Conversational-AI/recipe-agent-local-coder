@@ -75,6 +75,8 @@ class NgrokCliTunnel:
             if self._local_url != normalized_local:
                 raise NgrokTunnelError("ngrok_tunnel_unavailable")
             return self._status
+        if self._process is not None:
+            await self._stop_process()
         web_address = f"127.0.0.1:{self._api_port}"
         argv = (
             *self._command,

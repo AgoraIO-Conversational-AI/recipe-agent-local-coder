@@ -15,12 +15,14 @@ def create_public_app(
     tools: ManagedWorkTools,
     registry: CapabilityRegistry,
     host_policy: IngressHostPolicy,
+    handler_tracker=None,
 ) -> FastAPI:
     mcp = create_mcp_server(tools)
     mcp_asgi = McpIngressMiddleware(
         mcp.streamable_http_app(),
         registry=registry,
         host_policy=host_policy,
+        handler_tracker=handler_tracker,
     )
 
     @asynccontextmanager
