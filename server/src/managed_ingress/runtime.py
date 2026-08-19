@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import os
+from collections.abc import Callable
 from typing import Protocol
 from urllib.parse import urlparse
 
@@ -116,14 +117,18 @@ class ManagedIngressCoordinator:
         self,
         *,
         readiness: ReadinessPort,
-        listener: ListenerPort,
+        listener: ListenerPort | None = None,
+        listener_factory: Callable[[], ListenerPort] | None = None,
         tunnel: TunnelPort,
         registry: CapabilityRegistry,
         host_policy: IngressHostPolicy,
         handler_tracker: IngressHandlerTracker,
     ) -> None:
         self._readiness = readiness
+        if listener is None and listener_factory is None:
+            raise ValueError("A managed MCP listener is required")
         self._listener = listener
+        self._listener_factory = listener_factory
         self._tunnel = tunnel
         self._registry = registry
         self._host_policy = host_policy
@@ -142,6 +147,9 @@ class ManagedIngressCoordinator:
         async with self._lock:
             if self._started:
                 return
+            if self._listener is None:
+                assert self._listener_factory is not None
+                self._listener = self._listener_factory()
             await self._listener.start()
             self._started = True
 
@@ -255,6 +263,8 @@ class ManagedIngressCoordinator:
             self._accepting = False
 
     async def _ensure_tunnel(self) -> TunnelStatus:
+        if self._listener is None:
+            raise ManagedIngressError("mcp_listener_unavailable")
         if self._public_base_url is None:
             try:
                 return await self._tunnel.start(self._listener.local_url)

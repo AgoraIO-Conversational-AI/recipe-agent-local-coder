@@ -38,6 +38,11 @@ def main():
     import server as server_module
 
     server_module.agent = FakeAgent()
+    local_routes = os.getenv("VOICE_ACP_LOCAL_RUNTIME") == "1"
+    server_module.app = server_module.create_app(
+        enable_local_routes=local_routes,
+        enable_managed_ingress=False,
+    )
 
     port = int(os.getenv("PORT", "8000"))
     uvicorn.run(server_module.app, host="127.0.0.1", port=port)

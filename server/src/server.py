@@ -20,7 +20,7 @@ _base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 load_dotenv(os.path.join(_base_dir, '.env.local'), override=False)
 load_dotenv(os.path.join(_base_dir, '.env'), override=False)
 
-from fastapi import APIRouter, FastAPI, HTTPException, Query
+from fastapi import APIRouter, FastAPI, HTTPException, Query, Request
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from agora_agent.agentkit.token import generate_convo_ai_token
@@ -36,6 +36,16 @@ from architecture_validation.runtime import state_store
 from task_runtime.permissions import PermissionBroker
 from task_runtime.runtime import TaskRuntime, TaskRuntimeWorkspaceSwitchGuard
 from task_runtime.store import WorkStore
+from managed_ingress.capabilities import CapabilityRateLimiter, CapabilityRegistry
+from managed_ingress.http_policy import IngressHostPolicy
+from managed_ingress.ngrok import NgrokCliTunnel
+from managed_ingress.public_server import create_public_app as create_managed_public_app
+from managed_ingress.runtime import (
+    IngressHandlerTracker,
+    ManagedIngressCoordinator,
+    UvicornListener,
+)
+from managed_ingress.tools import ManagedWorkTools
 
 logger = logging.getLogger("uvicorn.error")
 
@@ -85,6 +95,11 @@ local_runtime = LocalRuntimeCoordinator(workspace_service, acp_client)
 router = APIRouter()
 
 
+def _request_agent(request: Request):
+    """Resolve the app-local production Agent or replaceable baseline Agent."""
+    return getattr(request.app.state, "agent", agent)
+
+
 # Request models
 class StartAgentRequest(BaseModel):
     """Request body for POST /startAgent"""
@@ -106,11 +121,13 @@ def _generate_channel_name() -> str:
 
 @router.get("/get_config")
 async def get_config(
+    request: Request,
     channel: Optional[str] = Query(default=None),
     uid: Optional[int] = Query(default=None),
 ):
     """Generate connection configuration"""
-    if agent is None:
+    resolved_agent = _request_agent(request)
+    if resolved_agent is None:
         raise HTTPException(
             status_code=500,
             detail="Service not properly configured. Please check environment variables.",
@@ -155,9 +172,10 @@ async def get_config(
 
 
 @router.post("/startAgent")
-async def start_agent(request: StartAgentRequest):
+async def start_agent(payload: StartAgentRequest, request: Request):
     """Start agent in a channel"""
-    if agent is None:
+    resolved_agent = _request_agent(request)
+    if resolved_agent is None:
         raise HTTPException(
             status_code=500,
             detail="Service not properly configured. Please check environment variables.",
@@ -165,13 +183,13 @@ async def start_agent(request: StartAgentRequest):
 
     try:
         output_audio_codec = None
-        if request.parameters:
-            output_audio_codec = request.parameters.get("output_audio_codec")
+        if payload.parameters:
+            output_audio_codec = payload.parameters.get("output_audio_codec")
 
-        result = await agent.start(
-            channel_name=request.channelName,
-            agent_uid=request.rtcUid,
-            user_uid=request.userUid,
+        result = await resolved_agent.start(
+            channel_name=payload.channelName,
+            agent_uid=payload.rtcUid,
+            user_uid=payload.userUid,
             output_audio_codec=output_audio_codec,
         )
         return {"code": 0, "msg": "success", "data": result}
@@ -179,27 +197,28 @@ async def start_agent(request: StartAgentRequest):
         _log_route_error(
             "/startAgent",
             e,
-            channelName=request.channelName,
-            rtcUid=request.rtcUid,
-            userUid=request.userUid,
+            channelName=payload.channelName,
+            rtcUid=payload.rtcUid,
+            userUid=payload.userUid,
         )
         raise _to_http_error(e)
 
 
 @router.post("/stopAgent")
-async def stop_agent(request: StopAgentRequest):
+async def stop_agent(payload: StopAgentRequest, request: Request):
     """Stop agent by ID"""
-    if agent is None:
+    resolved_agent = _request_agent(request)
+    if resolved_agent is None:
         raise HTTPException(
             status_code=500,
             detail="Service not properly configured. Please check environment variables.",
         )
 
     try:
-        await agent.stop(request.agentId)
+        await resolved_agent.stop(payload.agentId)
         return {"code": 0, "msg": "success"}
     except Exception as e:
-        _log_route_error("/stopAgent", e, agentId=request.agentId)
+        _log_route_error("/stopAgent", e, agentId=payload.agentId)
         raise _to_http_error(e)
 
 
@@ -214,7 +233,9 @@ def local_routes_enabled(env=os.environ) -> bool:
     return env.get("VOICE_ACP_LOCAL_RUNTIME") == "1"
 
 
-def create_app(*, enable_local_routes: bool) -> FastAPI:
+def create_app(
+    *, enable_local_routes: bool, enable_managed_ingress: bool | None = None
+) -> FastAPI:
     """Compose the FastAPI app; loopback routes mount only when opted in."""
     work_store = WorkStore.default() if enable_local_routes else None
     permission_broker = (
@@ -236,20 +257,77 @@ def create_app(*, enable_local_routes: bool) -> FastAPI:
         if work_store is not None and permission_broker is not None
         else None
     )
+    managed_enabled = (
+        enable_local_routes
+        if enable_managed_ingress is None
+        else enable_local_routes and enable_managed_ingress
+    )
+    managed_ingress = None
+    managed_agent = None
+    if managed_enabled and task_runtime is not None and work_store is not None:
+        managed_registry = CapabilityRegistry()
+        managed_host_policy = IngressHostPolicy()
+        managed_handler_tracker = IngressHandlerTracker()
+        public_app_holder = {}
+        managed_ingress = ManagedIngressCoordinator(
+            readiness=local_runtime,
+            listener_factory=lambda: UvicornListener(public_app_holder["app"]),
+            tunnel=NgrokCliTunnel(),
+            registry=managed_registry,
+            host_policy=managed_host_policy,
+            handler_tracker=managed_handler_tracker,
+        )
+        managed_tools = ManagedWorkTools(
+            runtime=task_runtime,
+            store=work_store,
+            workspace_generation=managed_ingress,
+            rate_limiter=CapabilityRateLimiter(),
+        )
+        public_app_holder["app"] = create_managed_public_app(
+            tools=managed_tools,
+            registry=managed_registry,
+            host_policy=managed_host_policy,
+            handler_tracker=managed_handler_tracker,
+        )
+        try:
+            managed_agent = Agent(work_bridge=managed_ingress)
+        except ValueError as exc:
+            logger.warning(
+                "Managed Work Agent is unavailable error_type=%s",
+                type(exc).__name__,
+            )
 
     @asynccontextmanager
     async def lifespan(_app: FastAPI):
         """Recover local Work without starting ACP; close owners inside-out."""
         if task_runtime is not None:
             await task_runtime.start()
+        if managed_ingress is not None:
+            await managed_ingress.start()
         try:
             yield
         finally:
-            if task_runtime is not None:
-                await task_runtime.close()
-            await local_runtime.close()
-            if work_store is not None:
-                work_store.close()
+            try:
+                if managed_ingress is not None:
+                    await managed_ingress.quiesce()
+            finally:
+                try:
+                    if managed_agent is not None:
+                        await managed_agent.close()
+                finally:
+                    try:
+                        if managed_ingress is not None:
+                            await managed_ingress.close()
+                    finally:
+                        try:
+                            if task_runtime is not None:
+                                await task_runtime.close()
+                        finally:
+                            try:
+                                await local_runtime.close()
+                            finally:
+                                if work_store is not None:
+                                    work_store.close()
 
     application = FastAPI(
         title="Agora Agent & Token Service",
@@ -278,10 +356,16 @@ def create_app(*, enable_local_routes: bool) -> FastAPI:
         application.include_router(build_admin_router(store=state_store))
     application.state.task_runtime = task_runtime
     application.state.work_store = work_store
+    application.state.managed_ingress = managed_ingress
+    if managed_enabled:
+        application.state.agent = managed_agent
     return application
 
 
-app = create_app(enable_local_routes=local_routes_enabled())
+app = create_app(
+    enable_local_routes=local_routes_enabled(),
+    enable_managed_ingress=local_routes_enabled(),
+)
 
 
 if __name__ == "__main__":

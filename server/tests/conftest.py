@@ -80,6 +80,12 @@ def server_module(fake_env, monkeypatch, tmp_path):
     import server
 
     importlib.reload(server)
+    # Existing route tests do not exercise the dedicated listener. Production
+    # ingress composition has its own fake-listener suite.
+    server.app = server.create_app(
+        enable_local_routes=True,
+        enable_managed_ingress=False,
+    )
     return server
 
 

@@ -42,8 +42,12 @@ def test_local_routes_enabled_requires_explicit_opt_in(server_module):
 
 def test_default_app_gates_loopback_and_admin_routes(server_module):
     """Without the opt-in, only the three stable quickstart routes are mounted."""
-    gated = server_module.create_app(enable_local_routes=False)
-    opted_in = server_module.create_app(enable_local_routes=True)
+    gated = server_module.create_app(
+        enable_local_routes=False, enable_managed_ingress=False
+    )
+    opted_in = server_module.create_app(
+        enable_local_routes=True, enable_managed_ingress=False
+    )
 
     assert gated.state.task_runtime is None
     assert gated.state.work_store is None
@@ -64,7 +68,9 @@ def test_default_app_gates_loopback_and_admin_routes(server_module):
 
 
 def test_local_lifespan_recovers_work_before_acceptance(server_module):
-    local_app = server_module.create_app(enable_local_routes=True)
+    local_app = server_module.create_app(
+        enable_local_routes=True, enable_managed_ingress=False
+    )
     store = local_app.state.work_store
     receipt, _ = store.create_or_get("scope-a", "turn-a", "Run tests")
     store.transition(receipt.work_id, "starting")
