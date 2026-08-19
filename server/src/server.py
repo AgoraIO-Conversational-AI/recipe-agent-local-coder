@@ -33,6 +33,9 @@ from acp_runtime.routes import build_runtime_router, build_workspace_router
 from acp_runtime.workspace import WorkspaceConfigStore, WorkspaceService
 from architecture_validation.admin import build_admin_router
 from architecture_validation.runtime import state_store
+from task_runtime.permissions import PermissionBroker
+from task_runtime.runtime import TaskRuntime, TaskRuntimeWorkspaceSwitchGuard
+from task_runtime.store import WorkStore
 
 logger = logging.getLogger("uvicorn.error")
 
@@ -75,16 +78,8 @@ except ValueError as exc:
     # A bad VOICE_ACP_WORKSPACE must not crash import; surface a clear warning
     # and leave the workspace unconfigured.
     logger.warning("Ignoring VOICE_ACP_WORKSPACE override: %s", exc)
-local_runtime = LocalRuntimeCoordinator(workspace_service, CodexAcpClient())
-
-
-@asynccontextmanager
-async def local_runtime_lifespan(_app: FastAPI):
-    """Keep ordinary server startup side-effect free; clean up if locally activated."""
-    try:
-        yield
-    finally:
-        await local_runtime.close()
+acp_client = CodexAcpClient()
+local_runtime = LocalRuntimeCoordinator(workspace_service, acp_client)
 
 
 router = APIRouter()
@@ -221,11 +216,46 @@ def local_routes_enabled(env=os.environ) -> bool:
 
 def create_app(*, enable_local_routes: bool) -> FastAPI:
     """Compose the FastAPI app; loopback routes mount only when opted in."""
+    work_store = WorkStore.default() if enable_local_routes else None
+    permission_broker = (
+        PermissionBroker(work_store) if work_store is not None else None
+    )
+    task_runtime = (
+        TaskRuntime(
+            workspace_service,
+            local_runtime,
+            acp_client,
+            work_store,
+            permission_broker,
+        )
+        if work_store is not None and permission_broker is not None
+        else None
+    )
+    switch_guard = (
+        TaskRuntimeWorkspaceSwitchGuard(work_store, permission_broker)
+        if work_store is not None and permission_broker is not None
+        else None
+    )
+
+    @asynccontextmanager
+    async def lifespan(_app: FastAPI):
+        """Recover local Work without starting ACP; close owners inside-out."""
+        if task_runtime is not None:
+            await task_runtime.start()
+        try:
+            yield
+        finally:
+            if task_runtime is not None:
+                await task_runtime.close()
+            await local_runtime.close()
+            if work_store is not None:
+                work_store.close()
+
     application = FastAPI(
         title="Agora Agent & Token Service",
         version="2.0.0",
         description="Agora Conversational AI service",
-        lifespan=local_runtime_lifespan,
+        lifespan=lifespan,
     )
     application.add_middleware(
         CORSMiddleware,
@@ -241,10 +271,13 @@ def create_app(*, enable_local_routes: bool) -> FastAPI:
                 service=workspace_service,
                 picker=MacOSDirectoryPicker(),
                 runtime=local_runtime,
+                switch_guard=switch_guard,
             )
         )
         application.include_router(build_runtime_router(runtime=local_runtime))
         application.include_router(build_admin_router(store=state_store))
+    application.state.task_runtime = task_runtime
+    application.state.work_store = work_store
     return application
 
 

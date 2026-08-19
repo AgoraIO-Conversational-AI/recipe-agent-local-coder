@@ -36,3 +36,28 @@ The blocking pre-ready state shown when the active Agent Profile requires a Proj
 
 The local-only lifecycle boundary that owns terminal signals and coordinates one clean shutdown of the backend, frontend, and their descendants.
 _Avoid_: Signal broadcaster, process-group launcher
+
+## Work
+
+One durable, Workspace-scoped executable objective delegated to the ACP Agent.
+
+## Work Receipt
+
+The authoritative persisted record of Work identity, state, safe activity,
+result, and delivery status. Acceptance exists only after this record commits.
+
+## Pending Permission
+
+One unresolved current-operation authorization request. It has no TTL and only
+an explicit allow, reject, Work cancellation, ACP cancellation, or runner exit
+can resolve it.
+
+## Final Presentation
+
+The backend-neutral completed result containing required speech text and
+optional safe inline content.
+
+## Task Runtime
+
+The local coordinator that owns durable Work receipts, FIFO ACP execution,
+permission correlation, confirmed cancellation, and safe result persistence.

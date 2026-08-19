@@ -6,7 +6,7 @@
 
 | Layer                    | Script / Tool                                | Bun target                | What it asserts                                              |
 | ------------------------ | -------------------------------------------- | ------------------------- | ------------------------------------------------------------ |
-| Python compile + unit    | `compileall` + validation + ACP-runtime pytest | `bun run verify:backend`  | Python source compiles; validation and fake ACP runtime behavior pass |
+| Python compile + unit    | `compileall` + validation + ACP + Task Runtime pytest | `bun run verify:backend`  | Python source compiles; validation and fake local-runtime behavior pass |
 | Web → Rewrite contract   | `web/scripts/verify-api-contracts.ts`        | `bun run verify:web:api`  | No `app/api` routes; `/api/*` rewrites + fetch shapes correct |
 | Web → rewrite stub       | `web/scripts/verify-local-proxy.ts`          | `bun run verify:web:proxy`| Imports `next.config.ts`, resolves rewrites, fetches an in-process stub directly |
 | Web → FastAPI + FakeAgent| `web/scripts/verify-local-fastapi.ts`        | `bun run verify:local:fastapi` | Spawns FastAPI with `FakeAgent` patched in              |
@@ -64,11 +64,11 @@ What it does:
 
 This is the closest CI gets to a full integration test. It never makes outbound calls.
 
-## Python Compile, Validation, and ACP Runtime Tests
+## Python Compile, Validation, ACP, and Task Runtime Tests
 
 `bun run verify:backend` compiles `server/src/` and runs the credential-free
 tests under `server/tests/architecture_validation/` and
-`server/tests/acp_runtime/`. The ACP runtime suite covers:
+`server/tests/acp_runtime/` plus `server/tests/task_runtime/`. These suites cover:
 
 - Workspace Scope persistence, existing-directory validation, and state changes.
 - Loopback-only workspace/readiness routes, picker cancellation, selection
@@ -84,11 +84,17 @@ tests under `server/tests/architecture_validation/` and
   protocol method names only. It validates saved-auth session creation,
   typed authentication-required retry, `new_session`, and process cleanup
   without starting Codex.
+- SQLite Work receipts, Workspace-scoped idempotency, valid state transitions,
+  safe bounded activity/results, and restart recovery.
+- Immediate durable acceptance, v0.1 FIFO queueing, exactly one ACP prompt at a
+  time, one current-operation permission, and confirmed cancellation.
+- Workspace-switch rejection while Work or a permission is nonterminal, plus
+  local lifespan startup and shutdown ordering.
 
 It catches:
 
 - Syntax errors.
-- Regression in the validation or local ACP foundation contracts listed above.
+- Regression in the validation, local ACP, or Task Runtime contracts listed above.
 
 It does **not** run the real pinned `npx` ACP package, complete browser
 authentication, start an Agora conversation, open ngrok, or operate a real

@@ -113,8 +113,18 @@ If you need real auth, add a FastAPI dependency that validates a header on each 
   storage retains only safe update-kind summaries and bounded permission prompts.
 - Readiness failures return fixed safe messages rather than exception text,
   paths, protocol/auth details, or command/environment values.
-- Permissions are cancelled by default in the foundation. The Permission Broker
-  and any decision flow are deferred to the Task Runtime plan.
+- The Task Runtime Permission Broker keeps at most one current-operation
+  request, stores only bounded safe fields, and correlates a response to its
+  Workspace and Work. Allow and reject responses select only advertised
+  `allow_once` and `reject_once` options; otherwise the request is cancelled.
+  There is no timeout. Work cancellation or runner shutdown resolves the
+  pending request without granting access.
+- Work receipts, safe activity, bounded results, and permission decisions are
+  persisted in a mode-`0600` SQLite file under a mode-`0700` state directory.
+  Raw ACP frames, thought content, authentication data, child environments,
+  and private protocol identifiers are not stored.
+- No HTTP or MCP Work/permission route is exposed yet. The future voice ingress
+  must authenticate session capabilities before it can call Task Runtime.
 - Reusable credentials are tried before authentication. Only a typed
   authentication-required response may invoke the advertised ChatGPT method and
   one retry. `CODEX_PATH`, `CODEX_API_KEY`, and `OPENAI_API_KEY` are explicit

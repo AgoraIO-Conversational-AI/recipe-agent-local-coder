@@ -60,6 +60,11 @@ The sections below (Start Here, Patterns, Anti-Patterns, etc.) remain the canoni
 - `LocalRuntimeCoordinator` owns at most one ACP session. It starts ACP only
   through explicit local activation after a ready Workspace Scope and closes an
   old session before a replacement. Ordinary FastAPI startup never starts ACP.
+- The opted-in local app owns one SQLite-backed Task Runtime Core. It persists
+  Work before FIFO execution, maps safe ACP activity, correlates one
+  current-operation permission, confirms cancellation, and fails interrupted
+  Work on restart. It exposes no Work route yet; MCP, SSE/UI, Speak, and ngrok
+  integration remain deferred.
 - `CodexAcpClient` owns its child process and defaults to
   `npx -y @agentclientprotocol/codex-acp@1.1.7` with `INITIAL_AGENT_MODE=agent`.
   It tries reusable authentication first, then uses an advertised ChatGPT method
@@ -102,6 +107,8 @@ The sections below (Start Here, Patterns, Anti-Patterns, etc.) remain the canoni
 - `server/src/agent.py`: async Agora agent lifecycle wrapper.
 - `server/src/acp_runtime/`: durable Workspace Scope, loopback settings routes,
   ACP child-process client, and local readiness coordinator.
+- `server/src/task_runtime/`: Work domain, SQLite store, Permission Broker, and
+  serial background ACP coordinator.
 
 ## Patterns
 

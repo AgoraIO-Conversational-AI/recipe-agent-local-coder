@@ -79,6 +79,18 @@ cleanup.
 bun run dev:codex
 ```
 
+The opted-in backend now includes the offline-tested **Task Runtime Core**. It
+persists Workspace-scoped Work receipts in `work.sqlite3`, executes ACP prompts
+through one FIFO worker, stores bounded activity and final text, correlates one
+current-operation permission, confirms cancellation, and fails interrupted
+Work safely after restart.
+
+The core is not connected to the Managed Voice LLM yet. Production MCP Work
+tools, SSE activity, the read-only task panel, Agora Speak result delivery, and
+ngrok launcher integration remain follow-on slices. Until those are complete,
+**Start conversation** still starts the ordinary managed voice assistant and
+does not delegate coding Work to Task Runtime.
+
 On first launch, the app opens a blocking **Project Folder** Settings gate.
 Choose an existing folder with the native macOS picker (or use the advanced
 path field). The resolved folder is persisted at

@@ -5,10 +5,16 @@
 
 ## Scope and Non-Scope
 
-This foundation adds Project Folder selection, durable Workspace Scope state,
-the Codex ACP client boundary, and local readiness. It deliberately does not
-implement Work receipts, prompt/update mapping, a Permission Broker, cancellation,
-authenticated MCP work tools, SSE activity, result delivery, or history.
+The local runtime adds Project Folder selection, durable Workspace Scope state,
+the Codex ACP client boundary, local readiness, and an offline-tested Task
+Runtime Core. The core implements durable Work receipts, serial ACP prompts,
+safe update/result mapping, one current-operation Permission Broker,
+cancellation, and restart recovery.
+
+It deliberately does not expose authenticated MCP Work tools, HTTP Work routes,
+SSE activity, an Activity Panel, voice result delivery, or transcript/history
+projection. The ordinary Managed Voice LLM conversation therefore does not yet
+delegate Work to ACP.
 
 Project Folder is the user-facing primary directory for ACP session context and
 relative paths. It is not a filesystem sandbox, access-control system, or
@@ -92,16 +98,43 @@ one session-creation retry.
 validation as Settings. `CODEX_PATH`, `CODEX_API_KEY`, and `OPENAI_API_KEY` are
 advanced child pass-through values. `--acp-command-json` supplies an
 experimental Compatible command as a JSON argv array and never invokes a shell.
-All paths preserve agent mode and never log child environments. Permission
-requests are captured in bounded safe summaries and cancelled by default; an
-interactive Permission Broker belongs to the next plan.
+All paths preserve agent mode and never log child environments. ACP prompt
+callbacks map only safe tool-kind labels, bounded agent text, and bounded
+permission questions. Thought content, raw frames, private identifiers,
+authentication data, and exception text are not retained.
+
+## Task Runtime Core
+
+`WorkStore` persists Workspace-scoped Work in SQLite before queueing it. It
+owns state transitions, idempotency, safe activity, permission records, bounded
+final results, and startup recovery. The database file is mode `0600` beneath a
+mode-`0700` state directory.
+
+`TaskRuntime` runs one background FIFO worker and at most one ACP prompt. It
+accepts Work durably and immediately, executes queued Work serially, aggregates
+safe ACP output, and stores a final presentation. There is no small v0.1 queue
+cap. A Workspace replacement or clear is rejected while Work or a permission
+is nonterminal.
+
+`PermissionBroker` correlates exactly one pending request to its Workspace,
+Work, and ACP request. An allow response selects only `allow_once`; a reject
+response selects only `reject_once`; otherwise it cancels. There is no
+permission timeout. Cancelling queued Work completes locally; cancelling
+running or permission-blocked Work calls ACP cancellation and waits for its
+completion before recording the terminal state.
+
+The local FastAPI lifespan starts Task Runtime, marks leftover accepted,
+queued, running, cancelling, or permission-blocked Work failed after a restart,
+and stops Task Runtime before closing the ACP coordinator and SQLite store.
+Public app construction creates none of these local objects.
 
 ## Verification Boundary
 
-`server/tests/acp_runtime/` uses fake ACP clients/processes. Root verification
-also uses fake FastAPI and proxy targets. These checks are offline-safe and
-verify contracts, lifecycle sequencing, persistence, loopback guards, and UI
-build/type behavior.
+`server/tests/acp_runtime/` and `server/tests/task_runtime/` use fake ACP
+clients/processes. Root verification also uses fake FastAPI and proxy targets.
+These checks are offline-safe and verify contracts, prompt/update mapping,
+SQLite persistence, FIFO execution, permissions, cancellation, restart
+recovery, lifecycle sequencing, loopback guards, and UI build/type behavior.
 
 They do not establish that the real pinned `npx` package installs or runs, that
 browser ChatGPT authentication succeeds, that the native picker works on a

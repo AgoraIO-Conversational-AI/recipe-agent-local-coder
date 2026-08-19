@@ -11,7 +11,7 @@
 | Language      | Python 3.10+ (FastAPI + uvicorn) backend + Next.js 16 / React 19 web  |
 | Deploy Target | `web/` as Next.js app, `server/` as a reachable FastAPI service      |
 | Owner         | Agora Conversational AI DevEx                                        |
-| Last Reviewed | 2026-08-16                                                           |
+| Last Reviewed | 2026-08-19                                                           |
 | Recipe Role   | `acp-local`                                                          |
 | Base Recipe   | `agent-quickstart-python` @ `1.0.0`                                  |
 | Recipe Version | `0.1.0`                                                             |
@@ -36,6 +36,7 @@ The Audience column helps agents prioritise: **Use** = consuming the quickstart'
 
 This repository also carries a local-only Codex foundation for a downstream
 voice-to-work derivative. Its asynchronous Project Folder picker, supervised
-local process lifecycle, ACP lifecycle, and `/api/local/*` routes are extension
-contracts, not part of the reusable three-route quickstart baseline. See
-[ACP Runtime](L1/L2/acp_runtime.md) when maintaining that derivative.
+local process lifecycle, ACP lifecycle, SQLite-backed Task Runtime Core, and
+`/api/local/*` routes are extension contracts, not part of the reusable
+three-route quickstart baseline. MCP Work ingress, SSE/UI, Speak, and ngrok
+integration remain deferred. See [ACP Runtime](L1/L2/acp_runtime.md).

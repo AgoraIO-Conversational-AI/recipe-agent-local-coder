@@ -26,6 +26,14 @@ routes, and safe failure states. They do not prove a real `npx` download or
 Codex launch, ChatGPT browser authentication, macOS picker behavior, Agora
 conversation start, or ngrok. Treat each as an authorized manual/live check.
 
+## Codex Ready Does Not Mean Voice-to-ACP Is Connected
+
+`LocalRuntimeStatus.state == "ready"` proves only that one ACP session is open.
+The Task Runtime Core can execute Work internally, but the Managed Voice LLM
+does not yet have an authenticated MCP Work ingress, so an ordinary voice
+conversation remains the standard managed assistant and will not delegate to
+Codex.
+
 ## Local Runtime Overrides Are Explicit and Narrow
 
 The default remains the pinned `npx` argv with `INITIAL_AGENT_MODE=agent`.

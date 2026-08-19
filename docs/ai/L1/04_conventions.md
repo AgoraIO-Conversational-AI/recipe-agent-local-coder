@@ -7,7 +7,7 @@
 | Concern        | Toolchain                                                                              |
 | -------------- | -------------------------------------------------------------------------------------- |
 | Python format  | None enforced in-repo. Match existing style; `ruff`/`black` are not configured.        |
-| Python verify  | Compile `server/src/` and run architecture-validation pytest (`bun run verify:backend`). |
+| Python verify  | Compile `server/src/` and run validation, ACP, and Task Runtime pytest (`bun run verify:backend`). |
 | Python deps    | `pip install -r server/requirements.txt` inside `server/venv` (created by `bun run setup:backend`). |
 | TypeScript     | `strict: true` in `web/tsconfig.json`; path alias `@/* → ./src/*`.                     |
 | Linter         | Biome (`web/biome.json`); `noExplicitAny` off, `useExhaustiveDependencies` off.        |
@@ -71,10 +71,18 @@ There is **no ESLint config file** in `web/` — Biome is the only TS/JS linter.
   command and agent mode. It tries reusable authentication before a typed
   auth-required ChatGPT retry. Advanced `CODEX_PATH`, API-key pass-through, and
   JSON-argv custom commands never log child environments or auto-select full access.
+- `TaskRuntime` owns one background FIFO worker and is the only production
+  caller of ACP prompts. Persist Work before queueing it; never expose raw ACP
+  frames, thought content, private identifiers, or exception text.
+- `WorkStore` uses one SQLite connection owned by the local app lifespan.
+  Workspace changes are rejected while any Work or permission is nonterminal.
+- `PermissionBroker` holds at most one current-operation request. Select only
+  `allow_once` or `reject_once`; cancellation is the fallback when a matching
+  option is unavailable.
 
 ## Testing
 
-- Python: `server/tests/architecture_validation/` uses pytest for the Managed-path evidence harness. `bun run verify:backend` runs that suite after `py_compile`; ordinary backend route coverage still comes from the smoke scripts.
+- Python: `bun run verify:backend` compiles the backend and runs the Managed-path validation, ACP runtime, and Task Runtime pytest suites; ordinary backend route coverage still comes from the smoke scripts.
 - TS: no Vitest harness. The verification suite layers Python compile/tests,
   Bun unit tests, API contracts, the rewrite stub, FakeAgent FastAPI smoke,
   launcher integration, local-preflight tests, and the production web build.
@@ -82,6 +90,9 @@ There is **no ESLint config file** in `web/` — Biome is the only TS/JS linter.
 - Keep architecture-validation Python tests under `server/tests/architecture_validation/` and run them without live Agora or model credentials.
 - ACP tests under `server/tests/acp_runtime/` use fake ACP clients/processes.
   They are offline-safe but do not establish real package launch or browser auth.
+- Task Runtime tests under `server/tests/task_runtime/` use fake ACP only and
+  cover SQLite receipts, FIFO execution, permissions, cancellation, recovery,
+  and Workspace switch protection without starting Agora.
 
 ## File Naming
 

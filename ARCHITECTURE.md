@@ -35,6 +35,7 @@ Browser Settings gate
   -> WorkspaceService (durable one-folder scope)
   -> LocalRuntimeCoordinator
   -> one ACP child process + one ACP session
+  -> TaskRuntime -> SQLite WorkStore + one FIFO ACP prompt worker
 ```
 
 The browser opens Settings automatically when the Codex profile has no valid
@@ -64,6 +65,17 @@ method and one session-creation retry. `CODEX_PATH`, `CODEX_API_KEY`, and
 Compatible ACP command is accepted only as a JSON argv array. None of these
 paths changes `INITIAL_AGENT_MODE=agent`, selects full access, or logs command
 environments.
+
+The Task Runtime Core starts only in the opted-in local app. It marks leftover
+nonterminal Work failed before accepting new Work, persists acceptance before
+queueing, executes one ACP prompt at a time, stores safe activity and a
+backend-neutral Final Presentation, and blocks Project Folder changes while
+Work or a permission is nonterminal. Shutdown stops Task Runtime before closing
+the ACP session and SQLite connection.
+
+No HTTP or MCP Work-control route is mounted by this slice. The managed Agent
+cannot submit real coding Work yet; authenticated MCP ingress, SSE/UI, Agora
+Speak delivery, and ngrok orchestration are separate follow-ons.
 
 ## Shared Conversation Flow
 

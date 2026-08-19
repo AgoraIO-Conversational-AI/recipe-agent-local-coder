@@ -100,6 +100,7 @@ the quickstart conversation routes:
 ```text
 Project Folder Settings gate -> /api/local/* -> /local/* -> WorkspaceService
   -> LocalRuntimeCoordinator -> CodexAcpClient child process -> ACP session
+  -> TaskRuntime -> SQLite WorkStore -> one FIFO ACP prompt worker
 ```
 
 `WorkspaceService` persists one resolved primary directory. It is ACP context,
@@ -116,11 +117,21 @@ child pass-through and JSON-argv custom commands remain in agent mode and do
 not expose command environments. Offline tests replace this boundary with fake
 clients/processes.
 
+The opted-in local app also owns `TaskRuntime`. It durably accepts
+Workspace-scoped Work before execution, runs one ACP prompt at a time, stores
+only safe activity and bounded results, brokers one current-operation
+permission, confirms cancellation, and recovers interrupted Work as failed on
+restart. It starts and stops with the local FastAPI lifespan. No browser or MCP
+Work route is exposed yet, so the Managed Voice LLM cannot submit Work to this
+core in the current milestone.
+
 ## Validation-only public boundary
 
 The Managed Voice LLM evidence harness constructs a second ASGI app at `server/src/architecture_validation/public_server.py`. The live runner serves it on a separate loopback port and exposes only that port through ngrok. It contains authenticated Streamable HTTP MCP only. Local lifecycle and seed routes remain on the original FastAPI surface and are never mounted into the public app.
 
-Both ASGI apps must run in one process because validation capabilities and synthetic state are deliberately in memory. This boundary is temporary and does not implement the production Task Runtime.
+Both ASGI apps must run in one process because validation capabilities and
+synthetic state are deliberately in memory. This validation boundary remains a
+separate synthetic harness; it does not invoke the production Task Runtime.
 
 ## Related Deep Dives
 

@@ -45,6 +45,11 @@ def test_default_app_gates_loopback_and_admin_routes(server_module):
     gated = server_module.create_app(enable_local_routes=False)
     opted_in = server_module.create_app(enable_local_routes=True)
 
+    assert gated.state.task_runtime is None
+    assert gated.state.work_store is None
+    assert opted_in.state.task_runtime is not None
+    assert opted_in.state.work_store is not None
+
     with TestClient(gated) as client:
         # Base quickstart route stays available.
         assert client.get("/get_config").status_code == 200
@@ -56,6 +61,19 @@ def test_default_app_gates_loopback_and_admin_routes(server_module):
 
     with TestClient(opted_in) as client:
         assert client.get("/local/workspace").status_code == 200
+
+
+def test_local_lifespan_recovers_work_before_acceptance(server_module):
+    local_app = server_module.create_app(enable_local_routes=True)
+    store = local_app.state.work_store
+    receipt, _ = store.create_or_get("scope-a", "turn-a", "Run tests")
+    store.transition(receipt.work_id, "starting")
+    store.transition(receipt.work_id, "running")
+
+    with TestClient(local_app):
+        recovered = store.get(receipt.work_id)
+        assert recovered.state == "failed"
+        assert recovered.error == "Local Runner restarted before Work completed."
 
 
 def test_invalid_workspace_override_does_not_crash_import(

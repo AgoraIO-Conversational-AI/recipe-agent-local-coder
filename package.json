@@ -33,7 +33,7 @@
     "verify:local": "bun run doctor:local && bun run verify:backend && bun run verify:local:fastapi && bun run verify:web:proxy && bun run verify:web:build",
     "verify:local:fastapi": "cd web && bun run scripts/verify-local-fastapi.ts",
     "verify:launcher": "bun run scripts/verify-local-launcher.ts",
-    "verify:backend": "cd server && source venv/bin/activate && python -m compileall -q src && PYTHONPATH=src pytest tests/architecture_validation tests/acp_runtime -q",
+    "verify:backend": "cd server && source venv/bin/activate && python -m compileall -q src && PYTHONPATH=src pytest tests/architecture_validation tests/acp_runtime tests/task_runtime -q",
     "verify:web": "bun run doctor && bun run verify:web:lint && bun run verify:web:api && bun run verify:web:build",
     "verify:web:lint": "cd web && bun run lint",
     "verify:web:api": "cd web && bun run scripts/verify-api-contracts.ts",

@@ -90,6 +90,18 @@ advanced child pass-through values; custom ACP is a JSON argv array. Secret
 values and child environments are not logged, and full access is never selected
 automatically.
 
+## Internal Task Runtime Contract
+
+The opted-in local app exposes a Python-only `TaskRuntime` service through
+`application.state.task_runtime`. It durably accepts Workspace-scoped Work,
+returns a receipt immediately, executes one ACP prompt at a time, records safe
+activity, correlates one pending permission, and supports confirmed
+cancellation. `application.state.work_store` owns the SQLite receipt database.
+
+There is intentionally no `/local/work`, `/api/local/work`, MCP Work tool, SSE,
+or Activity Panel contract in this milestone. Those are the next integration
+boundary; callers must not treat the internal service as a public HTTP API.
+
 ## Token Shape
 
 `get_config` returns:

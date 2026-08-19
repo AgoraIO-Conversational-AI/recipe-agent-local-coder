@@ -41,7 +41,7 @@ After editing, run `bun run verify:backend && bun run verify:web:api`.
 ```bash
 bun run doctor              # quick gate
 bun run doctor:local        # adds python3 + env checks
-bun run verify:backend      # Python compile + architecture-validation pytest
+bun run verify:backend      # Python compile + validation, ACP, and Task Runtime pytest
 bun run verify:web:api      # contract harness on the rewrite shape
 bun run verify:web:proxy    # static fake-server smoke
 bun run verify:local:fastapi # spawns FakeAgent inside FastAPI
@@ -78,6 +78,12 @@ Use `GET /api/local/runtime` only to display readiness; it must not start ACP.
 For a valid saved Workspace, the local page uses `POST /api/local/runtime` to
 activate ACP explicitly after ordinary FastAPI startup completes. Normal/public
 Next deployments do not register `/api/local/*` rewrites.
+
+The opted-in local FastAPI lifespan starts the Task Runtime, marks interrupted
+nonterminal Work failed, and stops it before ACP and SQLite shutdown. This does
+not start an ACP prompt by itself. The current web flow has no Work submission
+or activity route, and the Managed Voice LLM is not connected to Task Runtime
+until the authenticated MCP ingress milestone.
 
 The launcher preflight validates macOS Apple Silicon, Bun/Node/Python, and
 usable Agora configuration without printing secrets. Advanced examples:
