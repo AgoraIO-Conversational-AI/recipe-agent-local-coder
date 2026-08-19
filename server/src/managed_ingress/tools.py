@@ -55,7 +55,7 @@ class ManagedWorkTools:
         objective: str,
         idempotency_key: str,
     ) -> dict[str, object]:
-        unavailable = self._authorize(binding, "start_work")
+        unavailable = self._authorize(binding)
         if unavailable is not None:
             return unavailable
         try:
@@ -77,7 +77,7 @@ class ManagedWorkTools:
         binding: CapabilityBinding,
         work_id: str | None = None,
     ) -> dict[str, object]:
-        unavailable = self._authorize(binding, "get_work_status")
+        unavailable = self._authorize(binding)
         if unavailable is not None:
             return unavailable
         try:
@@ -92,7 +92,7 @@ class ManagedWorkTools:
         binding: CapabilityBinding,
         work_id: str | None = None,
     ) -> dict[str, object]:
-        unavailable = self._authorize(binding, "cancel_work")
+        unavailable = self._authorize(binding)
         if unavailable is not None:
             return unavailable
         try:
@@ -108,7 +108,7 @@ class ManagedWorkTools:
         binding: CapabilityBinding,
         decision: str,
     ) -> dict[str, object]:
-        unavailable = self._authorize(binding, "respond_permission")
+        unavailable = self._authorize(binding)
         if unavailable is not None:
             return unavailable
         if decision not in {"allow", "reject"}:
@@ -119,9 +119,7 @@ class ManagedWorkTools:
             return _public_error(exc)
         return {"code": "permission_resolved", "decision": decision}
 
-    def _authorize(
-        self, binding: CapabilityBinding, operation: str
-    ) -> dict[str, object] | None:
+    def _authorize(self, binding: CapabilityBinding) -> dict[str, object] | None:
         current = self._workspace_generation.current_workspace_identity()
         if current != (binding.workspace_id, binding.workspace_generation):
             return {"code": "runtime_unavailable", "retriable": True}

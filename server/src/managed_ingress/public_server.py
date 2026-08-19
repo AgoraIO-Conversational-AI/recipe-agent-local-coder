@@ -18,13 +18,12 @@ def create_public_app(
     handler_tracker=None,
     rate_limiter: CapabilityRateLimiter | None = None,
 ) -> FastAPI:
-    mcp = create_mcp_server(tools)
+    mcp = create_mcp_server(tools, rate_limiter)
     mcp_asgi = McpIngressMiddleware(
         mcp.streamable_http_app(),
         registry=registry,
         host_policy=host_policy,
         handler_tracker=handler_tracker,
-        rate_limiter=rate_limiter or CapabilityRateLimiter(),
     )
 
     @asynccontextmanager

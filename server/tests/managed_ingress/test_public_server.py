@@ -147,17 +147,31 @@ def test_tool_rate_exhaustion_returns_http_429():
             "arguments": {"objective": "test", "idempotency_key": "turn-a"},
         },
     }
+    invalid_request = {
+        **request,
+        "params": {"name": "start_work", "arguments": {}},
+    }
+    headers = {
+        "Authorization": f"Bearer {bearer}",
+        "Accept": "application/json, text/event-stream",
+    }
 
     with TestClient(app) as client:
+        invalid_responses = [
+            client.post("/mcp/", headers=headers, json=invalid_request)
+            for _ in range(11)
+        ]
         responses = [
             client.post(
                 "/mcp/",
-                headers={"Authorization": f"Bearer {bearer}"},
+                headers=headers,
                 json=request,
             )
             for _ in range(11)
         ]
 
+    assert all(response.status_code == 200 for response in invalid_responses)
+    assert all(response.status_code == 200 for response in responses[:10])
     assert responses[-1].status_code == 429
     assert responses[-1].json() == {"code": "rate_limited"}
 
