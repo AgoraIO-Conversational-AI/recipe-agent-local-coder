@@ -78,6 +78,7 @@ server/                   # Python FastAPI backend
       store.py            # SQLite Work receipts and recovery
       permissions.py      # one current-operation Permission Broker
       runtime.py          # serial FIFO ACP execution and workspace guard
+      safety.py           # credential-pattern redaction before SQLite writes
     architecture_validation/
       admin.py            # Loopback-only state seeding
       config.py           # Fail-closed Managed-path evidence controls

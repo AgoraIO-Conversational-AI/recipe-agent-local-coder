@@ -17,9 +17,6 @@ WorkState = Literal[
 DeliveryState = Literal[
     "not_ready",
     "pending_delivery",
-    "sending",
-    "accepted",
-    "delivery_unknown",
 ]
 PermissionDecision = Literal["allow", "reject"]
 PermissionKind = Literal[

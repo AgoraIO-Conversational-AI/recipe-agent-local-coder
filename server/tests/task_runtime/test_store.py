@@ -39,6 +39,31 @@ def test_same_idempotency_key_is_independent_across_workspaces(store):
     assert first.work_id != second.work_id
 
 
+def test_persisted_text_redacts_common_credentials(store):
+    receipt, _ = store.create_or_get(
+        "scope-a",
+        "turn-secret",
+        "Use OPENAI_API_KEY=spoken-secret and Authorization: Bearer abc123",
+    )
+    store.transition(receipt.work_id, "starting")
+    store.transition(receipt.work_id, "running")
+    store.save_final(
+        receipt.work_id,
+        FinalPresentation(
+            speech="Done with token: private-token",
+            inline='Result for {"password": "private-password"}',
+        ),
+    )
+
+    stored = store.get(receipt.work_id)
+    assert "spoken-secret" not in stored.objective
+    assert "abc123" not in stored.objective
+    assert stored.final_presentation is not None
+    assert "private-token" not in stored.final_presentation.speech
+    assert "private-password" not in stored.final_presentation.inline
+    assert "[REDACTED]" in stored.objective
+
+
 def test_transition_persists_activity_permission_and_final_result(store):
     receipt, _ = store.create_or_get("scope-a", "turn-1", "Run tests")
 

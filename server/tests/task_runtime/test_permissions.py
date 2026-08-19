@@ -82,6 +82,31 @@ async def test_reject_without_reject_once_returns_cancelled(permission_context):
 
 
 @pytest.mark.anyio
+async def test_allow_without_allow_once_cancels_and_reports_unavailable(
+    permission_context,
+):
+    _store, receipt, broker = permission_context
+    pending = asyncio.create_task(
+        broker.request(
+            receipt.work_id,
+            receipt.workspace_id,
+            request_with_options(
+                AcpPermissionOption("always", "Always allow", "allow_always")
+            ),
+        )
+    )
+    await wait_for_pending(broker, "scope-a")
+
+    with pytest.raises(
+        PermissionBrokerError, match="permission_option_unavailable"
+    ):
+        await broker.respond("scope-a", "allow")
+
+    assert (await pending).option_id is None
+    assert broker.has_pending("scope-a") is False
+
+
+@pytest.mark.anyio
 async def test_pending_permission_has_no_ttl_and_blocks_a_second_request(
     permission_context,
 ):

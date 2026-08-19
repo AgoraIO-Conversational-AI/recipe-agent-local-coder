@@ -35,6 +35,7 @@ class FakeExecutionAcp:
         self.cancel_event = asyncio.Event()
         self.permission_request: AcpPermissionRequest | None = None
         self.permission_outcomes = []
+        self.fail_next_prompt: Exception | None = None
 
     async def open(self, primary_directory: str) -> AcpSession:
         self.opened.append(primary_directory)
@@ -51,6 +52,10 @@ class FakeExecutionAcp:
             await observer.on_event(
                 AcpSessionEvent(kind="execute", label="Running command")
             )
+            if self.fail_next_prompt is not None:
+                failure = self.fail_next_prompt
+                self.fail_next_prompt = None
+                raise failure
             if self.permission_request is not None:
                 outcome = await observer.request_permission(self.permission_request)
                 self.permission_outcomes.append(outcome)
@@ -270,6 +275,31 @@ async def test_acp_failure_is_bounded_and_unready_runtime_rejects_acceptance(
     await context.readiness.close()
     with pytest.raises(TaskRuntimeError, match="workspace_not_ready"):
         await context.runtime.start_work("Another task", "turn-2")
+
+
+@pytest.mark.anyio
+async def test_acp_process_failure_reopens_only_for_subsequent_work(runtime_context):
+    context = runtime_context
+    context.acp.fail_next_prompt = ConnectionError("child exited with SECRET")
+    failed = await context.runtime.start_work("First task", "turn-1")
+    following = await context.runtime.start_work("Second task", "turn-2")
+
+    await wait_until(
+        lambda: context.store.get(failed.work_id).state == "failed",
+        "first failure",
+    )
+    await wait_until(
+        lambda: context.acp.objectives == ["First task", "Second task"],
+        "subsequent prompt",
+    )
+    context.acp.complete("Second task completed")
+    await wait_until(
+        lambda: context.store.get(following.work_id).state == "completed",
+        "subsequent completion",
+    )
+
+    assert context.acp.close_calls >= 1
+    assert len(context.acp.opened) == 2
 
 
 @pytest.mark.anyio

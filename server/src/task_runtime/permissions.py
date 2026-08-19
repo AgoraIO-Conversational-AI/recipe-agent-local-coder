@@ -110,6 +110,9 @@ class PermissionBroker:
             outcome = AcpPermissionOutcome(
                 option_id=selected.option_id if selected is not None else None
             )
+            if decision == "allow" and selected is None:
+                self._finish_locked(current, outcome)
+                raise PermissionBrokerError("permission_option_unavailable")
             resolution = PermissionResolution(
                 authorization_id=current.permission.authorization_id,
                 decision=decision,

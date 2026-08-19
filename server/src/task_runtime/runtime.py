@@ -216,6 +216,9 @@ class TaskRuntime:
         self._active_work_id = receipt.work_id
         try:
             self.store.transition(receipt.work_id, "starting")
+            readiness = await self._readiness.start()
+            if readiness.state != "ready":
+                raise TaskRuntimeError("workspace_not_ready")
             running = self.store.transition(receipt.work_id, "running")
             result = await self._acp.prompt(
                 running.objective,
@@ -226,6 +229,8 @@ class TaskRuntime:
             raise
         except Exception:
             self._fail_work(receipt.work_id)
+            with suppress(Exception):
+                await self._readiness.close()
         finally:
             self._active_work_id = None
 

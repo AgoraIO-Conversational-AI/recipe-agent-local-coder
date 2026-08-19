@@ -20,6 +20,7 @@ from .models import (
     WorkState,
     ensure_transition,
 )
+from .safety import redact_durable_text
 
 
 _SCHEMA_VERSION = "1.0"
@@ -145,7 +146,11 @@ class WorkStore:
         idempotency_key = _bounded(
             idempotency_key, name="idempotency_key", max_bytes=256
         )
-        objective = _bounded(objective, name="objective", max_bytes=16 * 1024)
+        objective = _bounded(
+            redact_durable_text(objective),
+            name="objective",
+            max_bytes=16 * 1024,
+        )
         existing = self._connection.execute(
             "SELECT * FROM works WHERE workspace_id = ? AND idempotency_key = ?",
             (workspace_id, idempotency_key),
@@ -252,7 +257,9 @@ class WorkStore:
     def append_activity(self, work_id: str, kind: str, label: str) -> SafeActivity:
         receipt = self.get(work_id)
         kind = _bounded(kind, name="activity kind", max_bytes=64)
-        label = _bounded(label, name="activity label", max_bytes=512)
+        label = _bounded(
+            redact_durable_text(label), name="activity label", max_bytes=512
+        )
         timestamp = _now()
         with self._connection:
             cursor = self._insert_activity(
@@ -354,6 +361,14 @@ class WorkStore:
         self, work_id: str, presentation: FinalPresentation
     ) -> WorkReceipt:
         self.get(work_id)
+        safe_presentation = FinalPresentation(
+            speech=redact_durable_text(presentation.speech),
+            inline=(
+                redact_durable_text(presentation.inline)
+                if presentation.inline is not None
+                else None
+            ),
+        )
         with self._connection:
             self._connection.execute(
                 """
@@ -361,7 +376,12 @@ class WorkStore:
                 SET speech = ?, inline = ?, delivery_state = 'pending_delivery', updated_at = ?
                 WHERE work_id = ?
                 """,
-                (presentation.speech, presentation.inline, _now(), work_id),
+                (
+                    safe_presentation.speech,
+                    safe_presentation.inline,
+                    _now(),
+                    work_id,
+                ),
             )
         return self.get(work_id)
 

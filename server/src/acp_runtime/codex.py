@@ -336,31 +336,29 @@ def _bounded_text(value: str, max_bytes: int) -> str:
     return normalized.encode("utf-8")[:max_bytes].decode("utf-8", errors="ignore")
 
 
+_OPERATION_METADATA: dict[str, tuple[str, str]] = {
+    "read": ("Inspecting files", "Read project files"),
+    "search": ("Inspecting files", "Search project files"),
+    "edit": ("Editing files", "Edit project files"),
+    "delete": ("Editing files", "Delete project files"),
+    "move": ("Editing files", "Move project files"),
+    "execute": ("Running command", "Run a command"),
+    "fetch": ("Fetching information", "Fetch information"),
+    "think": ("Organizing work", "Perform the current operation"),
+    "switch_mode": ("Updating work mode", "Change the Agent mode"),
+}
+
+
 def _activity_label(kind: str) -> str:
-    return {
-        "read": "Inspecting files",
-        "search": "Inspecting files",
-        "edit": "Editing files",
-        "delete": "Editing files",
-        "move": "Editing files",
-        "execute": "Running command",
-        "fetch": "Fetching information",
-        "think": "Organizing work",
-        "switch_mode": "Updating work mode",
-    }.get(kind, "Working")
+    return _OPERATION_METADATA.get(
+        kind, ("Working", "Perform the current operation")
+    )[0]
 
 
 def _permission_operation(kind: str) -> str:
-    return {
-        "read": "Read project files",
-        "search": "Search project files",
-        "edit": "Edit project files",
-        "delete": "Delete project files",
-        "move": "Move project files",
-        "execute": "Run a command",
-        "fetch": "Fetch information",
-        "switch_mode": "Change the Agent mode",
-    }.get(kind, "Perform the current operation")
+    return _OPERATION_METADATA.get(
+        kind, ("Working", "Perform the current operation")
+    )[1]
 
 
 def _permission_name(kind: str) -> str:
