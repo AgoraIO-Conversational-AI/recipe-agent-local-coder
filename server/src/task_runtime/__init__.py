@@ -14,6 +14,7 @@ from .models import (
     WorkState,
     ensure_transition,
 )
+from .store import WorkStore
 
 __all__ = [
     "DeliveryState",
@@ -26,6 +27,7 @@ __all__ = [
     "SafeActivity",
     "TERMINAL_STATES",
     "WorkReceipt",
+    "WorkStore",
     "WorkState",
     "ensure_transition",
 ]
