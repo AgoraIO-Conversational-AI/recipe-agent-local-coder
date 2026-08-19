@@ -128,7 +128,7 @@ function orphaningChildCommand(pidPath: string, signalPath: string): string {
 function startTerminalLauncher(
 	backend: string,
 	frontend: string,
-	graceSeconds = 0.25,
+	graceSeconds = 2,
 ) {
 	const child = spawn("bash", ["scripts/run-local-codex.sh"], {
 		cwd: root,
@@ -204,7 +204,7 @@ async function verifyOwnedTerminalSignal(
 
 		assert(
 			result.code === expectedExitCode && result.signal === null,
-			`terminal ${terminalSignal} should be owned and return status ${expectedExitCode}`,
+			`terminal ${terminalSignal} should be owned and return status ${expectedExitCode}; received code=${result.code} signal=${result.signal}`,
 		);
 		assert(
 			!result.output.includes("Traceback"),
@@ -360,7 +360,7 @@ try {
 
 	assert(
 		result.code === 130 && result.signal === null,
-		"one terminal interrupt burst should remain graceful and return 130",
+		`one terminal interrupt burst should remain graceful and return 130; received code=${result.code} signal=${result.signal}`,
 	);
 	assert(
 		readFileSync(backendSignals, "utf8").trim() === "SIGINT",
