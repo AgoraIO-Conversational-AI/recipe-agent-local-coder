@@ -14,6 +14,11 @@ from .models import (
     WorkState,
     ensure_transition,
 )
+from .permissions import (
+    PermissionBroker,
+    PermissionBrokerError,
+    PermissionResolution,
+)
 from .store import WorkStore
 
 __all__ = [
@@ -22,8 +27,11 @@ __all__ = [
     "NONTERMINAL_STATES",
     "PendingPermission",
     "PermissionDecision",
+    "PermissionBroker",
+    "PermissionBrokerError",
     "PermissionKind",
     "PermissionOption",
+    "PermissionResolution",
     "SafeActivity",
     "TERMINAL_STATES",
     "WorkReceipt",
