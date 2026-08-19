@@ -202,6 +202,19 @@ class WorkStore:
             raise KeyError("Work was not found")
         return self._receipt(row)
 
+    def find_by_idempotency(
+        self, workspace_id: str, idempotency_key: str
+    ) -> WorkReceipt | None:
+        workspace_id = _bounded(workspace_id, name="workspace_id", max_bytes=128)
+        idempotency_key = _bounded(
+            idempotency_key, name="idempotency_key", max_bytes=256
+        )
+        row = self._connection.execute(
+            "SELECT * FROM works WHERE workspace_id = ? AND idempotency_key = ?",
+            (workspace_id, idempotency_key),
+        ).fetchone()
+        return self._receipt(row) if row is not None else None
+
     def resolve(self, workspace_id: str, work_id: str | None = None) -> WorkReceipt:
         if work_id is not None:
             row = self._connection.execute(
@@ -428,6 +441,13 @@ class WorkStore:
             (workspace_id,),
         ).fetchone()
         return int(row["count"])
+
+    def queued_objective_bytes(self, workspace_id: str) -> int:
+        rows = self._connection.execute(
+            "SELECT objective FROM works WHERE workspace_id = ? AND state = 'queued'",
+            (workspace_id,),
+        ).fetchall()
+        return sum(len(str(row["objective"]).encode("utf-8")) for row in rows)
 
     def _insert_activity(
         self,

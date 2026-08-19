@@ -178,6 +178,46 @@ async def test_queue_has_no_small_count_cap_and_executes_fifo_without_concurrenc
 
 
 @pytest.mark.anyio
+async def test_queue_byte_budget_rejects_only_new_work(runtime_context):
+    context = runtime_context
+    context.runtime.max_queued_objective_bytes = 8
+    context.acp.permission_request = AcpPermissionRequest(
+        authorization_id="auth-a",
+        operation="Run a command",
+        options=(AcpPermissionOption("once", "Allow once", "allow_once"),),
+    )
+    accepted = await context.runtime.start_work("12345678", "turn-1")
+    await wait_until(
+        lambda: context.store.get(accepted.work_id).state == "awaiting_permission",
+        "pending permission",
+    )
+
+    duplicate = await context.runtime.start_work("different", "turn-1")
+    assert duplicate.work_id == accepted.work_id
+    with pytest.raises(TaskRuntimeError, match="permission_decision_required"):
+        await context.runtime.start_work("x", "turn-2")
+
+    await context.runtime.respond_permission("reject")
+    context.acp.complete("Permission rejected")
+    await wait_until(
+        lambda: context.store.get(accepted.work_id).state == "completed",
+        "completion",
+    )
+
+    blocker = await context.runtime.start_work("block", "turn-blocker")
+    await wait_until(
+        lambda: context.store.get(blocker.work_id).state == "running",
+        "blocking work",
+    )
+    queued = await context.runtime.start_work("12345678", "turn-3")
+    with pytest.raises(TaskRuntimeError, match="work_queue_budget_exceeded"):
+        await context.runtime.start_work("x", "turn-4")
+    assert context.store.find_by_idempotency("scope-a", "turn-4") is None
+    await context.runtime.cancel_work(queued.work_id)
+    await context.runtime.cancel_work(blocker.work_id)
+
+
+@pytest.mark.anyio
 async def test_permission_gate_blocks_new_work_but_allows_explicit_response(
     runtime_context,
 ):

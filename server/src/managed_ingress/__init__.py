@@ -7,6 +7,7 @@ from .capabilities import (
     CapabilityRegistryError,
 )
 from .models import CapabilityBinding, CapabilityLease
+from .tools import ManagedWorkTools, WorkspaceGenerationPort
 
 __all__ = [
     "CapabilityBinding",
@@ -15,4 +16,6 @@ __all__ = [
     "CapabilityRateLimiter",
     "CapabilityRegistry",
     "CapabilityRegistryError",
+    "ManagedWorkTools",
+    "WorkspaceGenerationPort",
 ]

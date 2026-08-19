@@ -39,6 +39,18 @@ def test_same_idempotency_key_is_independent_across_workspaces(store):
     assert first.work_id != second.work_id
 
 
+def test_idempotency_lookup_and_queued_objective_bytes_follow_queue_state(store):
+    first, _ = store.create_or_get("scope-a", "turn-1", "abcd")
+    second, _ = store.create_or_get("scope-a", "turn-2", "é")
+
+    assert store.find_by_idempotency("scope-a", "turn-1") == first
+    assert store.find_by_idempotency("scope-b", "turn-1") is None
+    assert store.queued_objective_bytes("scope-a") == 6
+
+    store.transition(first.work_id, "starting")
+    assert store.queued_objective_bytes("scope-a") == 2
+
+
 def test_persisted_text_redacts_common_credentials(store):
     receipt, _ = store.create_or_get(
         "scope-a",

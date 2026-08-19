@@ -34,6 +34,7 @@ _WORK_ERROR = "The coding Agent could not complete this Work."
 _SWITCH_CONFLICT = (
     "Wait for the current Work or permission decision before changing Project Folder."
 )
+MAX_QUEUED_OBJECTIVE_BYTES = 1024 * 1024
 
 
 class TaskRuntimeError(RuntimeError):
@@ -100,12 +101,14 @@ class TaskRuntime:
         acp_client: AcpClientPort,
         store: WorkStore,
         permissions: PermissionBroker,
+        max_queued_objective_bytes: int = MAX_QUEUED_OBJECTIVE_BYTES,
     ) -> None:
         self._workspace = workspace
         self._readiness = readiness
         self._acp = acp_client
         self.store = store
         self.permissions = permissions
+        self.max_queued_objective_bytes = max_queued_objective_bytes
         self._queue: asyncio.Queue[str] = asyncio.Queue()
         self._worker: asyncio.Task[None] | None = None
         self._accepting = False
@@ -155,8 +158,25 @@ class TaskRuntime:
         if not self._accepting:
             raise TaskRuntimeError("task_runtime_unavailable")
         workspace_id = self._ready_workspace_id()
+        try:
+            existing = self.store.find_by_idempotency(
+                workspace_id, idempotency_key
+            )
+        except ValueError as exc:
+            raise TaskRuntimeError("invalid_work_request") from exc
+        if existing is not None:
+            return existing
         if self.permissions.has_pending(workspace_id):
             raise TaskRuntimeError("permission_decision_required")
+        normalized_objective_bytes = len(
+            " ".join(objective.split()).encode("utf-8")
+        )
+        if (
+            self.store.queued_objective_bytes(workspace_id)
+            + normalized_objective_bytes
+            > self.max_queued_objective_bytes
+        ):
+            raise TaskRuntimeError("work_queue_budget_exceeded")
         try:
             receipt, created = self.store.create_or_get(
                 workspace_id,
