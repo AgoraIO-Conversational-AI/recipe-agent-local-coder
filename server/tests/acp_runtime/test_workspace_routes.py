@@ -7,6 +7,9 @@ from acp_runtime.acp_client import AcpSession
 from acp_runtime.readiness import LocalRuntimeCoordinator
 from acp_runtime.routes import build_runtime_router, build_workspace_router
 from acp_runtime.workspace import WorkspaceConfigStore, WorkspaceService
+from task_runtime.permissions import PermissionBroker
+from task_runtime.runtime import TaskRuntimeWorkspaceSwitchGuard
+from task_runtime.store import WorkStore
 
 
 class FakeDirectoryPicker:
@@ -220,6 +223,43 @@ def test_delete_clears_selection_without_touching_project(tmp_path):
     assert cleared.status_code == 200
     assert cleared.json()["data"]["state"] == "unconfigured"
     assert project.is_dir()
+
+
+def test_nonterminal_work_blocks_workspace_replacement_and_clear(tmp_path):
+    project = tmp_path / "project"
+    replacement = tmp_path / "replacement"
+    project.mkdir()
+    replacement.mkdir()
+    store = WorkStore(tmp_path / "work.sqlite3")
+    guard = TaskRuntimeWorkspaceSwitchGuard(store, PermissionBroker(store))
+    app, _picker, _runtime, _fake_acp = make_app(tmp_path, switch_guard=guard)
+
+    try:
+        with TestClient(app) as client:
+            selected = client.put(
+                "/local/workspace", json={"path": str(project)}
+            ).json()["data"]
+            store.create_or_get(
+                selected["workspace"]["id"],
+                "turn-a",
+                "Run the tests",
+            )
+
+            replaced = client.put(
+                "/local/workspace", json={"path": str(replacement)}
+            )
+            cleared = client.delete("/local/workspace")
+
+        expected = (
+            "Wait for the current Work or permission decision before changing "
+            "Project Folder."
+        )
+        assert replaced.status_code == 409
+        assert replaced.json()["detail"] == expected
+        assert cleared.status_code == 409
+        assert cleared.json()["detail"] == expected
+    finally:
+        store.close()
 
 
 def test_get_runtime_reports_configuration_required_without_starting_acp(tmp_path):

@@ -19,6 +19,11 @@ from .permissions import (
     PermissionBrokerError,
     PermissionResolution,
 )
+from .runtime import (
+    TaskRuntime,
+    TaskRuntimeError,
+    TaskRuntimeWorkspaceSwitchGuard,
+)
 from .store import WorkStore
 
 __all__ = [
@@ -34,6 +39,9 @@ __all__ = [
     "PermissionResolution",
     "SafeActivity",
     "TERMINAL_STATES",
+    "TaskRuntime",
+    "TaskRuntimeError",
+    "TaskRuntimeWorkspaceSwitchGuard",
     "WorkReceipt",
     "WorkStore",
     "WorkState",

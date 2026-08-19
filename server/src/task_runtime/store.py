@@ -57,7 +57,9 @@ class WorkStore:
         self.path = path
         self.path.parent.mkdir(parents=True, exist_ok=True, mode=0o700)
         os.chmod(self.path.parent, 0o700)
-        self._connection = sqlite3.connect(self.path)
+        # FastAPI's TestClient executes the app on its portal thread. Production
+        # access remains serialized by the one Task Runtime event loop.
+        self._connection = sqlite3.connect(self.path, check_same_thread=False)
         self._connection.row_factory = sqlite3.Row
         self._connection.execute("PRAGMA foreign_keys = ON")
         self._create_schema()
