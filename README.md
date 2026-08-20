@@ -91,6 +91,11 @@ the dedicated MCP listener, starts ngrok after ACP is ready, issues one
 per-Agent bearer, and injects exactly four Work tools. ngrok exposes only the
 MCP listener; ACP remains local stdio.
 
+The Managed Voice LLM is told that the selected Project Folder and registered
+tools are capabilities it can use. It delegates Workspace-dependent requests
+to `start_work` as natural-language objectives without requiring commands or
+using a preset task-category list.
+
 Agora may begin MCP discovery before Agent creation returns its real Agent ID.
 During that short pending phase, the bearer can authenticate only the
 side-effect-free MCP handshake; every Work tool remains unavailable until the

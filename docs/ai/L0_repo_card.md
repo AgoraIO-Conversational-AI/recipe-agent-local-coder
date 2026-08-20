@@ -41,5 +41,8 @@ local process lifecycle, ACP lifecycle, SQLite-backed Task Runtime Core, and
 three-route quickstart baseline. The derivative owns an isolated four-tool MCP
 listener and a launcher-owned, current-ngrok-compatible tunnel. Pending
 capabilities permit MCP discovery only; Work calls require exact Agent binding.
+The Managed Work prompt treats the selected Project Folder and registered tools
+as available capabilities, while `start_work` accepts a natural-language goal
+without enumerating anticipated task categories.
 SSE/UI, Agora Speak, proactive completion announcements, and reconnect
 rehydration remain deferred. See [ACP Runtime](L1/L2/acp_runtime.md).

@@ -110,6 +110,14 @@ non-handshake requests return HTTP `503 runtime_unavailable`. After exact Agent
 and Workspace-generation binding, the same bearer can call the four Work tools.
 Invalid or revoked bearers return HTTP `401 invalid_or_expired_capability`.
 
+The Managed Work system message states that one Project Folder is selected and
+that registered tools are capabilities of the voice assistant. When an answer
+or action depends on the Workspace or local environment, it delegates the
+user's complete natural-language objective through `start_work`; it does not
+require a shell command or enumerate anticipated Work categories. The public
+`start_work` description carries the same selected-Workspace and
+natural-language contract.
+
 ## Token Shape
 
 `get_config` returns:

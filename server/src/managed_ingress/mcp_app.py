@@ -39,7 +39,7 @@ def create_mcp_server(
 
     @mcp.tool()
     async def start_work(objective: str, idempotency_key: str) -> dict[str, object]:
-        """Accept one complete executable coding objective without waiting."""
+        """Act on the already-selected Project Folder by delegating one complete natural-language objective to the local coding Agent, and return immediately after acceptance."""
         binding = authorized_binding("start_work")
         if binding is None:
             return {"code": "rate_limited", "retriable": True}

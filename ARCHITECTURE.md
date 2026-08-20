@@ -90,6 +90,12 @@ Agora may initialize and discover MCP tools before Agent creation returns the
 real Agent ID. The prepared bearer permits only that side-effect-free handshake;
 all Work tool calls remain closed until exact Agent activation.
 
+The Managed Work system message treats the already-selected Project Folder and
+registered tools as available capabilities. It delegates Workspace-dependent
+natural-language objectives through `start_work` without exposing the path or
+enumerating task categories; the MCP tool description carries the same
+contract.
+
 SSE/UI, proactive permission/result announcements, and Agora Speak delivery
 remain separate follow-ons. Status grounding is available through MCP, but
 completion is not pushed into the conversation yet.

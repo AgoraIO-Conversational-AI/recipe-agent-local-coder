@@ -138,6 +138,12 @@ Authorization comes from one 256-bit, memory-only bearer bound to the actual
 Agora Agent and current Workspace generation. The capability is activated only
 after Agent creation succeeds and revoked before Agent or tunnel shutdown.
 
+The Managed Work prompt presents the already-selected Project Folder and
+registered tools as capabilities of the voice assistant. Workspace-dependent
+requests are delegated as complete natural-language objectives through
+`start_work`; the prompt and tool description intentionally contain no task
+category list, examples, command requirement, or Workspace path.
+
 Because Agora may initialize MCP before Agent creation returns, the prepared
 bearer first enters a pending discovery phase. Only `initialize`,
 `notifications/initialized`, `tools/list`, and `ping` are accepted then. Work

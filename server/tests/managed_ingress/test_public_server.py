@@ -210,6 +210,13 @@ async def test_server_registers_exactly_four_public_tools():
         "respond_permission",
     ]
 
+    start_work = tools[0]
+    assert start_work.description == (
+        "Act on the already-selected Project Folder by delegating one complete "
+        "natural-language objective to the local coding Agent, and return "
+        "immediately after acceptance."
+    )
+
 
 def test_public_app_exposes_only_authenticated_mcp():
     registry, bearer = active_registry()
