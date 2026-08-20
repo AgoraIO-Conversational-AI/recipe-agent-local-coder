@@ -29,7 +29,6 @@ done
 
 export VOICE_ACP_LOCAL_RUNTIME=1
 export VOICE_ACP_MCP_PORT="${VOICE_ACP_MCP_PORT:-8001}"
-export VOICE_ACP_NGROK_API_PORT="${VOICE_ACP_NGROK_API_PORT:-4041}"
 grace_seconds="${LOCAL_LAUNCHER_GRACE_SECONDS:-10}"
 
 exec python3 scripts/supervise-local.py \

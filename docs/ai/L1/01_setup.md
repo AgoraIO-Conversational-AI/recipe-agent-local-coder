@@ -65,7 +65,6 @@ AGENT_BACKEND_URL=http://localhost:8000
 | `CODEX_API_KEY` / `OPENAI_API_KEY` | ACP child | No | Advanced auth pass-through; values are never logged.                   |
 | `VOICE_ACP_COMMAND_JSON` | Python (local Codex) | No       | Advanced JSON argv array; never parsed by a shell.                     |
 | `VOICE_ACP_MCP_PORT`     | Python (local Codex) | No       | Dedicated loopback MCP listener; default `8001`.                       |
-| `VOICE_ACP_NGROK_API_PORT` | Python (local Codex) | No     | Local ngrok inspection API; default `4041`.                            |
 
 The optional Managed-path evidence harness additionally uses `VALIDATION_MODEL` and `PUBLIC_VALIDATION_BASE_URL`. It calls `update` and `say` through the authenticated Agent session and needs no separate model-provider credentials. The runner creates MCP capabilities in memory; do not add static capability tokens to `.env.local`.
 

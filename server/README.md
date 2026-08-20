@@ -37,7 +37,7 @@ and lets FastAPI own the Project Folder picker, ACP child process, Task Runtime,
 and dedicated MCP listener on `127.0.0.1:8001`. It does not start an Agora
 conversation until the browser user chooses **Start conversation**. At that
 point it starts ngrok, discovers the public MCP URL through the loopback API on
-port `4041`, and binds one capability to the Agent. Preflight requires macOS
+ngrok's default port `4040`, and binds one capability to the Agent. Preflight requires macOS
 Apple Silicon, Bun/Node/Python/ngrok, and usable Agora configuration without
 printing credential values. Install ngrok and run
 `ngrok config add-authtoken ...` once before this flow.

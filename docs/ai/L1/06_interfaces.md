@@ -54,7 +54,7 @@ production mode:
 | Local launcher/internal | `VOICE_ACP_LOCAL_RUNTIME`, `NEXT_PUBLIC_LOCAL_RUNTIME_ENABLED`, `VOICE_ACP_WORKSPACE` |
 | ACP child advanced     | `CODEX_PATH`, `CODEX_API_KEY`, `OPENAI_API_KEY` |
 | Compatible ACP command | `VOICE_ACP_COMMAND_JSON` (JSON argv array) |
-| Managed ingress ports  | `VOICE_ACP_MCP_PORT` (default `8001`), `VOICE_ACP_NGROK_API_PORT` (default `4041`) |
+| Managed ingress ports  | `VOICE_ACP_MCP_PORT` (default `8001`); ngrok uses its default loopback inspection API on `4040` |
 
 `AGENT_BACKEND_URL` is a Next **server**-time env var (used inside `next.config.ts`), not a `NEXT_PUBLIC_*` value — do not prefix it.
 

@@ -88,9 +88,8 @@ async def test_start_selects_clean_https_tunnel_without_a_shell():
         "stdout",
         "--log-format",
         "json",
-        "--web-addr",
-        "127.0.0.1:4041",
     )
+    assert http.urls == ["http://127.0.0.1:4040/api/tunnels"]
     assert commands[0][1]["start_new_session"] is False
     assert "secret" not in repr(status)
 

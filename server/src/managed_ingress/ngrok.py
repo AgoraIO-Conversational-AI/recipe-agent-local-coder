@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import asyncio
-import os
 import subprocess
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
@@ -46,7 +45,6 @@ class NgrokCliTunnel:
         self,
         *,
         command: tuple[str, ...] = ("ngrok",),
-        api_port: int | None = None,
         process_factory: Callable[..., Awaitable[object]] | None = None,
         http_client=None,
         startup_attempts: int = 100,
@@ -55,9 +53,6 @@ class NgrokCliTunnel:
         sleep: Callable[[float], Awaitable[None]] = asyncio.sleep,
     ) -> None:
         self._command = command
-        self._api_port = api_port or int(
-            os.getenv("VOICE_ACP_NGROK_API_PORT", "4041")
-        )
         self._process_factory = process_factory or _default_process_factory
         self._http = http_client or httpx.AsyncClient(timeout=1.0, trust_env=False)
         self._owns_http = http_client is None
@@ -77,7 +72,6 @@ class NgrokCliTunnel:
             return self._status
         if self._process is not None:
             await self._stop_process()
-        web_address = f"127.0.0.1:{self._api_port}"
         argv = (
             *self._command,
             "http",
@@ -86,8 +80,6 @@ class NgrokCliTunnel:
             "stdout",
             "--log-format",
             "json",
-            "--web-addr",
-            web_address,
         )
         try:
             self._process = await self._process_factory(
@@ -150,7 +142,7 @@ class NgrokCliTunnel:
             return None
         try:
             response = await self._http.get(
-                f"http://127.0.0.1:{self._api_port}/api/tunnels"
+                "http://127.0.0.1:4040/api/tunnels"
             )
             response.raise_for_status()
             payload = response.json()
