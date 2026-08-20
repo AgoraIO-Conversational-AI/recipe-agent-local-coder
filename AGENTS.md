@@ -67,7 +67,9 @@ The sections below (Start Here, Patterns, Anti-Patterns, etc.) remain the canoni
 - The local app owns a separate bearer-authenticated MCP listener. ngrok maps
   only that listener and starts lazily for a Work-capable Agent after ACP is
   ready. Exactly four tools call the real Task Runtime; Agent stop revokes its
-  capability before stopping the session. Never mount this app into FastAPI.
+  capability before stopping the session. A pending capability may complete
+  only the side-effect-free MCP handshake; tools require exact Agent binding.
+  Never mount this app into FastAPI.
 - `CodexAcpClient` owns its child process and defaults to
   `npx -y @agentclientprotocol/codex-acp@1.1.7` with `INITIAL_AGENT_MODE=agent`.
   It tries reusable authentication first, then uses an advertised ChatGPT method

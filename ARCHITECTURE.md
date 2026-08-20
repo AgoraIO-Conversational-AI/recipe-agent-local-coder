@@ -86,6 +86,10 @@ MCP listener exposes only four Work tools and is never mounted into the
 lifecycle FastAPI app. ngrok starts lazily when an Agent is prepared after ACP
 readiness and remains in the launcher's process group for forced cleanup.
 
+Agora may initialize and discover MCP tools before Agent creation returns the
+real Agent ID. The prepared bearer permits only that side-effect-free handshake;
+all Work tool calls remain closed until exact Agent activation.
+
 SSE/UI, proactive permission/result announcements, and Agora Speak delivery
 remain separate follow-ons. Status grounding is available through MCP, but
 completion is not pushed into the conversation yet.

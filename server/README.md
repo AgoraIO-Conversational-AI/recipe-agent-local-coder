@@ -42,6 +42,10 @@ Apple Silicon, Bun/Node/Python/ngrok, and usable Agora configuration without
 printing credential values. Install ngrok and run
 `ngrok config add-authtoken ...` once before this flow.
 
+Agora may initialize MCP before Agent creation returns. The pending bearer
+allows only protocol discovery; the four Work tools remain closed until the
+backend binds the real Agent ID.
+
 This assumes the Agora CLI is installed and logged in. The command uses the project selected in your Agora CLI context, which is usually your default account project.
 
 If you are not using the Agora CLI, create the env file manually and fill in your project values:

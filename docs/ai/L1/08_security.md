@@ -131,6 +131,11 @@ If you need real auth, add a FastAPI dependency that validates a header on each 
   shared cancellation/permission mutation budget, and are revoked before
   Agent or tunnel shutdown. Tool projections omit filesystem paths, internal
   identifiers, raw ACP frames, and unbounded results.
+- A valid pending bearer admits only `initialize`,
+  `notifications/initialized`, `tools/list`, and `ping` so Agora can complete
+  discovery while Agent creation returns. Pending tool calls, unknown methods,
+  mixed batches, malformed JSON, GET, and DELETE return `503` and cannot create
+  Work. Only exact active Agent binding grants Work authority.
 - Reusable credentials are tried before authentication. Only a typed
   authentication-required response may invoke the advertised ChatGPT method and
   one retry. `CODEX_PATH`, `CODEX_API_KEY`, and `OPENAI_API_KEY` are explicit

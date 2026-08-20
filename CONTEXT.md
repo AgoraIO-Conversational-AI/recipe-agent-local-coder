@@ -71,7 +71,9 @@ FastAPI.
 
 ## Agent Capability
 
-One high-entropy, in-memory bearer bound to an exact active Agora Agent,
+One high-entropy, in-memory bearer prepared for one Agora Agent creation. While
+pending, it authenticates only side-effect-free MCP discovery. Work authority
+exists only after the bearer is bound to the exact active Agora Agent,
 Workspace Scope, and Workspace generation. It is a temporary development
 credential rather than the durable identity of Work and is revoked before the
 Agent stops.

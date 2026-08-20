@@ -12,7 +12,11 @@ from managed_ingress.public_server import create_public_app
 
 
 class FakeTools:
+    def __init__(self):
+        self.start_calls = 0
+
     async def start_work(self, **kwargs):
+        self.start_calls += 1
         return {"code": "work_accepted", "arguments": sorted(kwargs)}
 
     async def get_work_status(self, **kwargs):
@@ -33,6 +37,164 @@ def active_registry() -> tuple[CapabilityRegistry, str]:
     lease = registry.prepare("scope-a", 1)
     registry.activate(lease.lease_id, "agent-a")
     return registry, lease.bearer
+
+
+def test_pending_capability_allows_discovery_but_not_tools_until_activation():
+    registry = CapabilityRegistry(
+        token_factory=lambda: "test-bearer",
+        id_factory=lambda: "credential-a",
+    )
+    lease = registry.prepare("scope-a", 1)
+    tools = FakeTools()
+    app = create_public_app(
+        tools=tools,
+        registry=registry,
+        host_policy=IngressHostPolicy(),
+    )
+    headers = {
+        "Authorization": f"Bearer {lease.bearer}",
+        "Accept": "application/json, text/event-stream",
+    }
+    initialize = {
+        "jsonrpc": "2.0",
+        "id": 1,
+        "method": "initialize",
+        "params": {
+            "protocolVersion": "2025-06-18",
+            "capabilities": {},
+            "clientInfo": {"name": "agora", "version": "test"},
+        },
+    }
+    tool_call = {
+        "jsonrpc": "2.0",
+        "id": 2,
+        "method": "tools/call",
+        "params": {
+            "name": "start_work",
+            "arguments": {
+                "objective": "Inspect the project",
+                "idempotency_key": "turn-a",
+            },
+        },
+    }
+
+    with TestClient(app) as client:
+        assert client.post("/mcp/", headers=headers, json=initialize).status_code == 200
+        pending_call = client.post("/mcp/", headers=headers, json=tool_call)
+        assert pending_call.status_code == 503
+        assert pending_call.json() == {"code": "runtime_unavailable"}
+        assert tools.start_calls == 0
+
+        registry.activate(lease.lease_id, "agent-a")
+        assert client.post("/mcp/", headers=headers, json=tool_call).status_code == 200
+        assert tools.start_calls == 1
+
+        registry.revoke(lease.lease_id)
+        assert client.post("/mcp/", headers=headers, json=initialize).status_code == 401
+
+
+@pytest.mark.parametrize(
+    ("method", "has_id"),
+    [
+        ("initialize", True),
+        ("notifications/initialized", False),
+        ("tools/list", True),
+        ("ping", True),
+    ],
+)
+def test_pending_capability_allows_only_side_effect_free_handshake_methods(
+    method, has_id
+):
+    registry = CapabilityRegistry(
+        token_factory=lambda: "test-bearer",
+        id_factory=lambda: "credential-a",
+    )
+    lease = registry.prepare("scope-a", 1)
+    tools = FakeTools()
+    app = create_public_app(
+        tools=tools,
+        registry=registry,
+        host_policy=IngressHostPolicy(),
+    )
+    headers = {
+        "Authorization": f"Bearer {lease.bearer}",
+        "Accept": "application/json, text/event-stream",
+    }
+    request = {"jsonrpc": "2.0", "method": method, "params": {}}
+    if has_id:
+        request["id"] = 1
+    if method == "initialize":
+        request["params"] = {
+            "protocolVersion": "2025-06-18",
+            "capabilities": {},
+            "clientInfo": {"name": "agora", "version": "test"},
+        }
+
+    with TestClient(app) as client:
+        response = client.post("/mcp/", headers=headers, json=request)
+
+    assert response.status_code not in {401, 503}
+    assert tools.start_calls == 0
+
+
+def test_pending_capability_rejects_unknown_malformed_mixed_and_non_post_calls():
+    registry = CapabilityRegistry(
+        token_factory=lambda: "test-bearer",
+        id_factory=lambda: "credential-a",
+    )
+    lease = registry.prepare("scope-a", 1)
+    tools = FakeTools()
+    app = create_public_app(
+        tools=tools,
+        registry=registry,
+        host_policy=IngressHostPolicy(),
+    )
+    headers = {
+        "Authorization": f"Bearer {lease.bearer}",
+        "Accept": "application/json, text/event-stream",
+    }
+    initialize = {
+        "jsonrpc": "2.0",
+        "id": 1,
+        "method": "initialize",
+        "params": {
+            "protocolVersion": "2025-06-18",
+            "capabilities": {},
+            "clientInfo": {"name": "agora", "version": "test"},
+        },
+    }
+    tool_call = {
+        "jsonrpc": "2.0",
+        "id": 2,
+        "method": "tools/call",
+        "params": {
+            "name": "start_work",
+            "arguments": {
+                "objective": "Do not run",
+                "idempotency_key": "turn-a",
+            },
+        },
+    }
+
+    with TestClient(app) as client:
+        unknown = client.post(
+            "/mcp/",
+            headers=headers,
+            json={"jsonrpc": "2.0", "id": 3, "method": "resources/list"},
+        )
+        malformed = client.post(
+            "/mcp/",
+            headers={**headers, "Content-Type": "application/json"},
+            content="{",
+        )
+        mixed = client.post("/mcp/", headers=headers, json=[initialize, tool_call])
+        get_response = client.get("/mcp/", headers=headers)
+        delete_response = client.delete("/mcp/", headers=headers)
+
+    for response in (unknown, malformed, mixed, get_response, delete_response):
+        assert response.status_code == 503
+        assert response.json() == {"code": "runtime_unavailable"}
+    assert tools.start_calls == 0
 
 
 @pytest.mark.anyio

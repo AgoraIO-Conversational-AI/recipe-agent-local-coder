@@ -138,6 +138,11 @@ Authorization comes from one 256-bit, memory-only bearer bound to the actual
 Agora Agent and current Workspace generation. The capability is activated only
 after Agent creation succeeds and revoked before Agent or tunnel shutdown.
 
+Because Agora may initialize MCP before Agent creation returns, the prepared
+bearer first enters a pending discovery phase. Only `initialize`,
+`notifications/initialized`, `tools/list`, and `ping` are accepted then. Work
+tools remain `503 runtime_unavailable` until activation binds the real Agent ID.
+
 The public app contains no lifecycle, settings, admin, docs, or OpenAPI routes.
 It authenticates before body reads, applies request-size limits, start/status
 budgets, a shared mutation budget, and safe bounded projections. Rate

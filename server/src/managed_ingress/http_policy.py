@@ -12,6 +12,12 @@ from .models import CapabilityBinding
 
 
 MAX_MCP_REQUEST_BYTES = 64 * 1024
+_PENDING_METHODS = {
+    "initialize",
+    "notifications/initialized",
+    "tools/list",
+    "ping",
+}
 _current_binding: ContextVar[CapabilityBinding | None] = ContextVar(
     "managed_mcp_binding", default=None
 )
@@ -118,14 +124,15 @@ class McpIngressMiddleware:
             "latin-1", errors="ignore"
         )
         scheme, separator, bearer = authorization.partition(" ")
-        binding = (
-            self._registry.resolve(bearer)
+        access = (
+            self._registry.authenticate(bearer)
             if separator and scheme.casefold() == "bearer"
             else None
         )
-        if binding is None:
+        if access is None:
             await _respond(send, 401, "invalid_or_expired_capability", bearer=True)
             return
+        binding = access.binding
         host = headers.get(b"host", b"").decode("latin-1", errors="ignore")
         if not self._host_policy.allows_host(host):
             await _respond(send, 421, "invalid_host")
@@ -133,6 +140,9 @@ class McpIngressMiddleware:
         origin = headers.get(b"origin", b"").decode("latin-1", errors="ignore")
         if not self._host_policy.allows_origin(origin):
             await _respond(send, 403, "invalid_origin")
+            return
+        if access.state == "pending" and method != "POST":
+            await _respond(send, 503, "runtime_unavailable")
             return
         entered = self._handler_tracker is None or self._handler_tracker.try_enter()
         if not entered:
@@ -164,6 +174,11 @@ class McpIngressMiddleware:
                         await _respond(send, 413, "request_too_large")
                         return
                     more_body = bool(message.get("more_body", False))
+                if access.state == "pending" and not _pending_handshake_only(
+                    bytes(body)
+                ):
+                    await _respond(send, 503, "runtime_unavailable")
+                    return
                 delivered = False
 
                 async def replay_receive():
@@ -211,3 +226,15 @@ async def _respond(send, status: int, code: str, *, bearer: bool = False) -> Non
         headers.append((b"www-authenticate", b"Bearer"))
     await send({"type": "http.response.start", "status": status, "headers": headers})
     await send({"type": "http.response.body", "body": body})
+
+
+def _pending_handshake_only(body: bytes) -> bool:
+    try:
+        payload = json.loads(body)
+    except (json.JSONDecodeError, UnicodeDecodeError):
+        return False
+    messages = payload if isinstance(payload, list) else [payload]
+    return bool(messages) and all(
+        isinstance(message, dict) and message.get("method") in _PENDING_METHODS
+        for message in messages
+    )

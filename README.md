@@ -91,6 +91,11 @@ the dedicated MCP listener, starts ngrok after ACP is ready, issues one
 per-Agent bearer, and injects exactly four Work tools. ngrok exposes only the
 MCP listener; ACP remains local stdio.
 
+Agora may begin MCP discovery before Agent creation returns its real Agent ID.
+During that short pending phase, the bearer can authenticate only the
+side-effect-free MCP handshake; every Work tool remains unavailable until the
+backend binds the exact Agent ID.
+
 Install ngrok and complete `ngrok config add-authtoken ...` once before the
 first run. The bearer, full MCP configuration, Workspace path, and internal ACP
 identifiers are never returned to the browser or persisted. Ending the Agent or

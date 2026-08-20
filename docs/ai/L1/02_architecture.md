@@ -135,6 +135,12 @@ Agent, kept only in memory, and revoked before Agent/tunnel shutdown. A tunnel
 URL change requires an Agent restart because the endpoint is part of the Agent
 configuration.
 
+Agora can send MCP `initialize` and tool discovery before Agent creation
+returns. The prepared bearer therefore has a pending phase that admits only
+`initialize`, `notifications/initialized`, `tools/list`, and `ping`. Tool calls
+remain closed with a retriable `503` until the real `agent_id` activates the
+binding; invalid and revoked bearers remain `401`.
+
 ## Validation-only public boundary
 
 The Managed Voice LLM evidence harness constructs a second ASGI app at `server/src/architecture_validation/public_server.py`. The live runner serves it on a separate loopback port and exposes only that port through ngrok. It contains authenticated Streamable HTTP MCP only. Local lifecycle and seed routes remain on the original FastAPI surface and are never mounted into the public app.

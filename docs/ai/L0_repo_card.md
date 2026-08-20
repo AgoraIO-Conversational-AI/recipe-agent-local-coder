@@ -11,7 +11,7 @@
 | Language      | Python 3.10+ (FastAPI + uvicorn) backend + Next.js 16 / React 19 web  |
 | Deploy Target | `web/` as Next.js app, `server/` as a reachable FastAPI service      |
 | Owner         | Agora Conversational AI DevEx                                        |
-| Last Reviewed | 2026-08-19                                                           |
+| Last Reviewed | 2026-08-20                                                           |
 | Recipe Role   | `acp-local`                                                          |
 | Base Recipe   | `agent-quickstart-python` @ `1.0.0`                                  |
 | Recipe Version | `0.1.0`                                                             |
@@ -39,7 +39,7 @@ voice-to-work derivative. Its asynchronous Project Folder picker, supervised
 local process lifecycle, ACP lifecycle, SQLite-backed Task Runtime Core, and
 `/api/local/*` routes are extension contracts, not part of the reusable
 three-route quickstart baseline. The derivative owns an isolated four-tool MCP
-listener and a launcher-owned, current-ngrok-compatible tunnel bound to one
-Agent capability.
+listener and a launcher-owned, current-ngrok-compatible tunnel. Pending
+capabilities permit MCP discovery only; Work calls require exact Agent binding.
 SSE/UI, Agora Speak, proactive completion announcements, and reconnect
 rehydration remain deferred. See [ACP Runtime](L1/L2/acp_runtime.md).
