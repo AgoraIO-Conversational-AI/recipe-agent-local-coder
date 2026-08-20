@@ -82,6 +82,7 @@ server/                   # Python FastAPI backend
     managed_ingress/
       models.py           # capability and Agent lease value objects
       capabilities.py     # bearer binding and rate budgets
+      delivery.py         # exact-session terminal Work speech coordinator
       tools.py            # four safe Task Runtime projections
       http_policy.py      # auth, host/origin, size, and handler guards
       mcp_app.py          # production four-tool FastMCP surface

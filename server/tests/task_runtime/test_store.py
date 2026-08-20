@@ -303,7 +303,7 @@ def test_database_reopens_with_private_permissions(tmp_path):
         reopened.close()
 
 
-def test_version_1_database_is_upgraded_without_losing_work(tmp_path):
+def test_version_1_database_adds_delivery_target_without_breaking_rollback(tmp_path):
     path = tmp_path / "state" / "work.sqlite3"
     path.parent.mkdir()
     connection = sqlite3.connect(path)
@@ -355,6 +355,30 @@ def test_version_1_database_is_upgraded_without_losing_work(tmp_path):
         ).fetchone()["value"]
 
         assert "delivery_agent_id" in columns
-        assert version == "1.1"
+        assert version == "1.0"
+        inspection.execute(
+            """
+            INSERT INTO works(
+              work_id, workspace_id, idempotency_key, objective, state,
+              created_at, updated_at, delivery_state
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            (
+                "work-after-rollback",
+                "scope-a",
+                "turn-after-rollback",
+                "Old writer",
+                "queued",
+                "2026-08-20T00:00:01Z",
+                "2026-08-20T00:00:01Z",
+                "not_ready",
+            ),
+        )
+        inspection.commit()
+        inserted = inspection.execute(
+            "SELECT delivery_agent_id FROM works WHERE work_id = ?",
+            ("work-after-rollback",),
+        ).fetchone()
+        assert inserted["delivery_agent_id"] is None
     finally:
         inspection.close()

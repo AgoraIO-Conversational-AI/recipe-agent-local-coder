@@ -75,7 +75,11 @@ assert duplicate.delivery_agent_id == "agent-a"
 
 - [ ] **Step 2: Write failing schema-upgrade test**
 
-Create a version-`1.0` SQLite fixture with the current `works` columns, open it through `WorkStore`, and assert `delivery_agent_id` exists and the metadata version is upgraded without losing the existing receipt. Use SQLite `PRAGMA table_info(works)` as the migration-seam assertion.
+Create a version-`1.0` SQLite fixture with the preceding `works` columns, open
+it through `WorkStore`, and assert `delivery_agent_id` exists while metadata
+remains `1.0` and the existing receipt is preserved. Use SQLite
+`PRAGMA table_info(works)` and an insert containing only the old column list to
+prove the preceding artifact can still write after rollback.
 
 - [ ] **Step 3: Write failing compare-and-set tests**
 
@@ -117,7 +121,10 @@ class WorkReceipt:
     delivery_state: DeliveryState = "not_ready"
 ```
 
-Bump `_SCHEMA_VERSION` to `"1.1"`. In `_create_schema()`, accept a stored `1.0`, add the nullable column exactly once when absent, then update metadata to `1.1`. Reject every other unsupported version. New databases create the column directly.
+Keep `_SCHEMA_VERSION` at `"1.0"` and add the nullable column exactly once when
+absent. This additive migration lets the preceding `1.0` artifact ignore the
+column during rollback. Reject every unsupported metadata version. New
+databases create the column directly.
 
 Normalize a non-null target with `_bounded(..., name="delivery_agent_id", max_bytes=128)`. Insert it only for new Work. Include it in `_receipt()`; never include it in activity or public projections.
 

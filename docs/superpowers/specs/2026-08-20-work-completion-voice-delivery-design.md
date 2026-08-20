@@ -162,8 +162,10 @@ No browser route, MCP tool, SSE endpoint, environment variable, or UI component
 is added. Existing four-tool MCP shape remains unchanged. The status projection
 continues to expose the safe delivery state and final presentation.
 
-`delivery_agent_id` is private and must not appear in MCP responses, browser
-responses, logs, or Activity data.
+`delivery_agent_id` is a private Work-receipt field and must create no new
+exposure through MCP or Work browser projections, Activity data, or delivery
+logs. The existing `/startAgent` lifecycle response and lifecycle diagnostics
+retain their established Agent ID contract.
 
 ## Testing
 

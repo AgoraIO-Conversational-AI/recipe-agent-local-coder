@@ -118,8 +118,9 @@ require a shell command or enumerate anticipated Work categories. The public
 `start_work` description carries the same selected-Workspace and
 natural-language contract.
 
-Each targeted receipt privately stores `delivery_agent_id`; this field is never
-part of MCP or browser projections. After completed or failed state commits,
+Each targeted receipt privately stores `delivery_agent_id`; this receipt field
+is never added to MCP or Work browser projections. The existing `/startAgent`
+Agent ID response remains unchanged. After completed or failed state commits,
 the local delivery coordinator may move `pending_delivery -> sending ->
 accepted|delivery_unknown`. It may release `sending` back to
 `pending_delivery` only when it proves Speak submission never began.

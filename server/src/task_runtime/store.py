@@ -23,7 +23,7 @@ from .models import (
 from .safety import redact_durable_text
 
 
-_SCHEMA_VERSION = "1.1"
+_SCHEMA_VERSION = "1.0"
 _STATE_ACTIVITY: dict[WorkState, tuple[str, str]] = {
     "queued": ("accepted", "Work accepted"),
     "starting": ("starting", "Starting work"),
@@ -131,21 +131,18 @@ class WorkStore:
                     "INSERT INTO metadata(key, value) VALUES('schema_version', ?)",
                     (_SCHEMA_VERSION,),
                 )
-            elif existing["value"] == "1.0":
-                columns = {
-                    row["name"]
-                    for row in self._connection.execute("PRAGMA table_info(works)")
-                }
-                if "delivery_agent_id" not in columns:
-                    self._connection.execute(
-                        "ALTER TABLE works ADD COLUMN delivery_agent_id TEXT"
-                    )
-                self._connection.execute(
-                    "UPDATE metadata SET value = ? WHERE key = 'schema_version'",
-                    (_SCHEMA_VERSION,),
-                )
             elif existing["value"] != _SCHEMA_VERSION:
                 raise ValueError("Unsupported Work Store schema version")
+            columns = {
+                row["name"]
+                for row in self._connection.execute("PRAGMA table_info(works)")
+            }
+            if "delivery_agent_id" not in columns:
+                # Additive and nullable so a rollback to the prior 1.0 artifact
+                # can continue reading and writing the same database.
+                self._connection.execute(
+                    "ALTER TABLE works ADD COLUMN delivery_agent_id TEXT"
+                )
 
     def close(self) -> None:
         self._connection.close()
