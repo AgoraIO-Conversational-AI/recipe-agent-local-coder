@@ -1,7 +1,7 @@
 # Managed Work Routing Prompt Design
 
 **Date:** 2026-08-20  
-**Status:** Approved for implementation
+**Status:** Revised for approval
 
 ## Problem
 
@@ -17,29 +17,29 @@ provide a command. ngrok recorded no `tools/call`, and the Work database stayed
 empty.
 
 The current system prompt says to use `start_work` for a complete request, but
-does not state that the Project Folder is already selected, that natural
-language is sufficient, or that read-only file inspection is a complete coding
-objective. The current tool description also says only that it accepts a
-complete executable objective.
+does not state that the Project Folder is already selected or that natural
+language is sufficient. The current tool description also says only that it
+accepts a complete executable objective.
 
 ## Decision
 
 Strengthen only the Managed Work prompt and the public `start_work` tool
 description.
 
-The system prompt will state:
+The system prompt will use one capability-based routing rule rather than an
+enumeration of task types or examples:
 
 - the Project Folder is already selected and available to the local coding
   Agent;
+- when a response or action depends on Workspace contents or local tooling, the
+  voice model delegates the user's objective through `start_work` instead of
+  attempting the task itself;
 - `start_work` accepts a complete natural-language objective and does not
   require a shell command from the user;
-- listing, reading, searching, counting, explaining, testing, or changing
-  project files are complete Work requests when their requested outcome is
-  clear;
 - the voice model must not claim that it cannot inspect the Project Folder or
   ask the user to translate a clear objective into a command;
-- it should ask one clarification only when the desired outcome is genuinely
-  ambiguous or missing.
+- it asks one clarification only when the objective lacks information required
+  to define the requested outcome.
 
 The `start_work` description will say that it delegates a natural-language
 objective to the local coding Agent in the already-selected Project Folder.
@@ -50,6 +50,8 @@ objective to the local coding Agent in the already-selected Project Folder.
 - Do not change the Managed model, temperature, STT, TTS, or VAD.
 - Do not introduce Custom LLM routing or a second intent classifier.
 - Do not execute commands in the voice process or expose the Workspace path.
+- Do not enumerate, classify, or provide examples of anticipated Work scenarios
+  in the prompt or tool description.
 - Do not claim deterministic tool choice; Managed LLM selection remains model
   behavior and requires one live acceptance after offline contract checks.
 
@@ -58,8 +60,8 @@ objective to the local coding Agent in the already-selected Project Folder.
 Offline tests will verify two stable configuration contracts:
 
 1. `build_work_voice_llm()` serializes a system message containing the
-   selected-Workspace, natural-language delegation, read-only inspection, and
-   no-command-required rules.
+   selected-Workspace, capability-based routing, natural-language delegation,
+   and no-command-required rules, without a task-type list.
 2. `create_mcp_server(...).list_tools()` exposes `start_work` with a description
    that identifies natural-language delegation and the selected Project Folder.
 
