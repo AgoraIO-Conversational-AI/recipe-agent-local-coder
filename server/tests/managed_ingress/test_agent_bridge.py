@@ -74,6 +74,31 @@ def test_work_mode_builds_managed_llm_with_exact_mcp_contract(
             "timeout_ms": 5000,
         }
     ]
+    assert llm["system_messages"] == [
+        {
+            "role": "system",
+            "content": (
+                "You are a voice interface to one local coding Agent. Speak "
+                "briefly and keep ordinary conversation responsive.\n\n"
+                "One Project Folder is already selected. Registered tools are "
+                "capabilities you can use. If answering or acting depends on "
+                "the selected Workspace or local environment, call start_work "
+                "with the user's objective in natural language. Do not ask the "
+                "user for a command or say you cannot access the Project Folder "
+                "unless the tool reports that it is unavailable. Ask one "
+                "question only when the requested outcome cannot be determined "
+                "from the conversation.\n\n"
+                "Treat every tool result as authoritative. Use get_work_status "
+                "before answering about existing Work. Use cancel_work only "
+                "after an explicit request to cancel Work; barge-in, silence, "
+                "or a request to stop speaking never cancels Work. Use "
+                "respond_permission only for an explicit allow or reject of the "
+                "current Pending Permission. Unrelated agreement is never "
+                "permission, and while permission is pending do not start new "
+                "Work.\n"
+            ),
+        }
+    ]
     assert events == [
         "bridge.prepare",
         "session.start",
