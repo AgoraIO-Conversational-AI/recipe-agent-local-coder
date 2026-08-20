@@ -123,6 +123,10 @@ If you need real auth, add a FastAPI dependency that validates a header on each 
   persisted in a mode-`0600` SQLite file under a mode-`0700` state directory.
   Raw ACP frames, thought content, authentication data, child environments,
   and private protocol identifiers are not stored.
+- A targeted Work receipt privately persists its originating Agora Agent ID so
+  completion cannot be redirected to a newer session. That ID is never exposed
+  through MCP, browser responses, activity, or delivery logs. Only the bounded,
+  redacted stored speech/error is submitted to the exact active Agent session.
 - No lifecycle HTTP Work/permission route is exposed. The dedicated public MCP
   app exposes only four tools, authenticates before reading request bodies,
   enforces Host/Origin/method/content-type policy and a 64 KiB pre-read cap,

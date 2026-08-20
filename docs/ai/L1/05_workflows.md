@@ -82,9 +82,12 @@ Next deployments do not register `/api/local/*` rewrites.
 The opted-in local FastAPI lifespan starts the Task Runtime, marks interrupted
 nonterminal Work failed, and stops it before ACP and SQLite shutdown. After ACP
 is ready, **Start conversation** prepares the isolated four-tool MCP listener,
-starts ngrok, and binds one capability to the Agora Agent. Work completion is
-available through `get_work_status`; proactive result speech and an Activity
-Panel are not part of this milestone.
+starts ngrok, and binds one capability to the Agora Agent. Completed and failed
+Work is submitted once to the exact originating active Agent through APPEND
+Speak. API acceptance is persisted but is not playback proof. If the session is
+gone, the Workspace changed, or delivery is uncertain, `get_work_status`
+remains authoritative. Activity Panel, playback receipts, automatic replay,
+and proactive permission speech are not part of this milestone.
 
 The launcher preflight validates macOS Apple Silicon, Bun/Node/Python/ngrok, and
 usable Agora configuration without printing secrets. Advanced examples:

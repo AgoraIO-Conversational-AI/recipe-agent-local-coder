@@ -135,6 +135,14 @@ Agent, kept only in memory, and revoked before Agent/tunnel shutdown. A tunnel
 URL change requires an Agent restart because the endpoint is part of the Agent
 configuration.
 
+`WorkDeliveryCoordinator` receives only terminal Work IDs after Task Runtime
+commits completed or failed state. Each receipt privately retains its
+originating Agent ID. The coordinator revalidates that exact Work-capable
+session and Workspace, atomically claims `pending_delivery`, and submits the
+stored safe speech through Agent Speak with APPEND priority. Normal return is
+`accepted`; an ambiguous exception is `delivery_unknown` and is not retried.
+No session or a changed Workspace leaves the result pending for status lookup.
+
 Agora can send MCP `initialize` and tool discovery before Agent creation
 returns. The prepared bearer therefore has a pending phase that admits only
 `initialize`, `notifications/initialized`, `tools/list`, and `ping`. Tool calls

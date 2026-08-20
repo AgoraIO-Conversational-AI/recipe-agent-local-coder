@@ -13,8 +13,9 @@ cancellation, and restart recovery.
 
 It exposes authenticated MCP Work tools only through a dedicated public ASGI
 listener. It deliberately does not expose HTTP Work routes, SSE activity, an
-Activity Panel, proactive voice result delivery, or transcript/history
-projection. The Managed Voice LLM can delegate Work to ACP and poll status.
+Activity Panel, or transcript/history projection. The Managed Voice LLM can
+delegate Work to ACP and poll status. Completed and failed Work can also submit
+one safe announcement to the exact originating active Agent session.
 
 Project Folder is the user-facing primary directory for ACP session context and
 relative paths. It is not a filesystem sandbox, access-control system, or
@@ -154,8 +155,17 @@ It authenticates before body reads, applies request-size limits, start/status
 budgets, a shared mutation budget, and safe bounded projections. Rate
 exhaustion returns HTTP `429`. A background health check closes Work acceptance
 on tunnel loss and forces Agent restart when the public URL changes.
-SSE/Activity Panel, Agora Speak, proactive announcements, and reconnect
-rehydration remain deferred.
+
+Terminal targeted Work wakes one local `WorkDeliveryCoordinator` only after the
+receipt commit. It revalidates the exact Agent and Workspace before atomically
+claiming `pending_delivery`, then calls Agent Speak with `APPEND` and
+`interruptable=True`. A normal SDK return records `accepted`; an exception
+after submission begins records `delivery_unknown` and is not retried. A
+missing Agent or Workspace mismatch leaves the result pending. Startup never
+scans old pending results, so a newer session cannot receive them.
+
+SSE/Activity Panel, playback receipts, batching, proactive permission
+announcements, and reconnect rehydration remain deferred.
 
 ## Verification Boundary
 

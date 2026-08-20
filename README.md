@@ -106,10 +106,14 @@ first run. The bearer, full MCP configuration, Workspace path, and internal ACP
 identifiers are never returned to the browser or persisted. Ending the Agent or
 launcher revokes the bearer before stopping the tunnel.
 
-SSE activity, the read-only task panel, proactive permission/result
-announcements, and Agora Speak result delivery remain follow-on slices. Until
-those exist, ask the voice Agent for task status to retrieve progress, a pending
-permission, or a completed result; completion is not announced automatically.
+Completed and failed Work now asks the exact originating active Agora Agent to
+speak the stored safe result with APPEND priority. A successful request records
+`accepted`; it does not prove playback completed. If that Agent has ended, the
+Workspace changed, or submission has an unknown outcome, the durable result
+remains available through `get_work_status` and is never replayed into a newer
+session automatically. SSE activity, the read-only task panel, proactive
+permission announcements, playback receipts, and reconnect replay remain
+follow-on slices.
 
 On first launch, the app opens a blocking **Project Folder** Settings gate.
 Choose an existing folder with the native macOS picker (or use the advanced

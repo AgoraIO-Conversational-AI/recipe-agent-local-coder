@@ -96,9 +96,14 @@ natural-language objectives through `start_work` without exposing the path or
 enumerating task categories; the MCP tool description carries the same
 contract.
 
-SSE/UI, proactive permission/result announcements, and Agora Speak delivery
-remain separate follow-ons. Status grounding is available through MCP, but
-completion is not pushed into the conversation yet.
+After Task Runtime commits completed or failed targeted Work, an in-process
+delivery coordinator revalidates the exact originating Agent and Workspace,
+claims the durable pending result, and calls that Agent session's Speak API
+with APPEND priority. Normal API return records `accepted`; a submission error
+records `delivery_unknown` and is not retried. Missing/stopped sessions and
+Workspace mismatch stay `pending_delivery`, with `get_work_status` as the
+fallback. SSE/UI, proactive permission announcements, playback receipts,
+batching, and reconnect replay remain separate follow-ons.
 
 ## Shared Conversation Flow
 

@@ -37,6 +37,7 @@ from task_runtime.permissions import PermissionBroker
 from task_runtime.runtime import TaskRuntime, TaskRuntimeWorkspaceSwitchGuard
 from task_runtime.store import WorkStore
 from managed_ingress.capabilities import CapabilityRateLimiter, CapabilityRegistry
+from managed_ingress.delivery import WorkDeliveryCoordinator
 from managed_ingress.http_policy import IngressHostPolicy
 from managed_ingress.ngrok import NgrokCliTunnel
 from managed_ingress.public_server import create_public_app as create_managed_public_app
@@ -264,6 +265,7 @@ def create_app(
     )
     managed_ingress = None
     managed_agent = None
+    work_delivery = None
     if managed_enabled and task_runtime is not None and work_store is not None:
         managed_registry = CapabilityRegistry()
         managed_host_policy = IngressHostPolicy()
@@ -297,10 +299,19 @@ def create_app(
                 "Managed Work Agent is unavailable error_type=%s",
                 type(exc).__name__,
             )
+        if managed_agent is not None:
+            work_delivery = WorkDeliveryCoordinator(
+                store=work_store,
+                sessions=managed_agent,
+                workspace=managed_ingress,
+            )
+            task_runtime.set_terminal_callback(work_delivery.notify)
 
     @asynccontextmanager
     async def lifespan(_app: FastAPI):
         """Recover local Work without starting ACP; close owners inside-out."""
+        if work_delivery is not None:
+            await work_delivery.start()
         if task_runtime is not None:
             await task_runtime.start()
         if managed_ingress is not None:
@@ -313,22 +324,26 @@ def create_app(
                     await managed_ingress.quiesce()
             finally:
                 try:
-                    if managed_agent is not None:
-                        await managed_agent.close()
+                    if work_delivery is not None:
+                        await work_delivery.close()
                 finally:
                     try:
-                        if managed_ingress is not None:
-                            await managed_ingress.close()
+                        if managed_agent is not None:
+                            await managed_agent.close()
                     finally:
                         try:
-                            if task_runtime is not None:
-                                await task_runtime.close()
+                            if managed_ingress is not None:
+                                await managed_ingress.close()
                         finally:
                             try:
-                                await local_runtime.close()
+                                if task_runtime is not None:
+                                    await task_runtime.close()
                             finally:
-                                if work_store is not None:
-                                    work_store.close()
+                                try:
+                                    await local_runtime.close()
+                                finally:
+                                    if work_store is not None:
+                                        work_store.close()
 
     application = FastAPI(
         title="Agora Agent & Token Service",
@@ -358,6 +373,7 @@ def create_app(
     application.state.task_runtime = task_runtime
     application.state.work_store = work_store
     application.state.managed_ingress = managed_ingress
+    application.state.work_delivery = work_delivery
     if managed_enabled:
         application.state.agent = managed_agent
     return application

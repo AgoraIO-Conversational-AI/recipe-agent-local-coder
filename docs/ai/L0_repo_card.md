@@ -43,6 +43,8 @@ listener and a launcher-owned, current-ngrok-compatible tunnel. Pending
 capabilities permit MCP discovery only; Work calls require exact Agent binding.
 The Managed Work prompt treats the selected Project Folder and registered tools
 as available capabilities, while `start_work` accepts a natural-language goal
-without enumerating anticipated task categories.
-SSE/UI, Agora Speak, proactive completion announcements, and reconnect
-rehydration remain deferred. See [ACP Runtime](L1/L2/acp_runtime.md).
+without enumerating anticipated task categories. Completed and failed Work is
+submitted once to its exact active Agent session; durable delivery state keeps
+status lookup authoritative when speech is unavailable or uncertain. SSE/UI,
+playback receipts, proactive permission, and reconnect replay remain deferred.
+See [ACP Runtime](L1/L2/acp_runtime.md).

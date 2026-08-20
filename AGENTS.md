@@ -72,6 +72,9 @@ The sections below (Start Here, Patterns, Anti-Patterns, etc.) remain the canoni
   The Managed Work prompt presents the selected Project Folder and registered
   tools as capabilities, and `start_work` accepts a complete natural-language
   objective without a command or preset task-category list.
+  Completed and failed targeted Work is submitted once to the exact still-active
+  Agent session with APPEND priority. API acceptance is not playback proof;
+  missing sessions remain pending and ambiguous submission is never retried.
   Never mount this app into FastAPI.
 - `CodexAcpClient` owns its child process and defaults to
   `npx -y @agentclientprotocol/codex-acp@1.1.7` with `INITIAL_AGENT_MODE=agent`.
