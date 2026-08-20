@@ -352,6 +352,18 @@ class Agent:
         logger.info("Stopping Agora agent through client.stop_agent agent_id=%s", agent_id)
         await self.client.stop_agent(agent_id)
 
+    def has_work_session(self, agent_id: str) -> bool:
+        """Whether the exact Agent still owns an active Work-capable session."""
+        return agent_id in self._sessions and agent_id in self._work_leases
+
+    async def say_work_result(self, agent_id: str, text: str) -> bool:
+        """Submit safe stored Work speech only to its exact active session."""
+        session = self._sessions.get(agent_id)
+        if session is None or agent_id not in self._work_leases:
+            return False
+        await session.say(text, priority="APPEND", interruptable=True)
+        return True
+
     async def close(self) -> None:
         """Revoke and stop every locally owned session without unknown-ID fallback."""
         for agent_id in list(self._sessions):

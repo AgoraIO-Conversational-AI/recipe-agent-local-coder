@@ -131,6 +131,73 @@ def test_stop_revokes_capability_before_stopping_session(fake_env, monkeypatch):
     assert events[-2:] == ["bridge.revoke:lease-a", "session.stop"]
 
 
+def test_work_result_speaks_only_through_the_exact_active_work_session(
+    fake_env, monkeypatch
+):
+    import agent
+
+    events = []
+    bridge = FakeBridge(events)
+
+    class FakeSession:
+        def __init__(self):
+            self.say_calls = []
+
+        async def start(self):
+            return "agent-a"
+
+        async def say(self, text, priority=None, interruptable=None):
+            self.say_calls.append((text, priority, interruptable))
+
+        async def stop(self):
+            events.append("session.stop")
+
+    session = FakeSession()
+    monkeypatch.setattr(
+        AgoraAgent, "create_async_session", lambda self, **_kwargs: session
+    )
+    instance = agent.Agent(work_bridge=bridge)
+    asyncio.run(instance.start(channel_name="ch", agent_uid=111, user_uid=222))
+
+    assert instance.has_work_session("agent-a") is True
+    assert instance.has_work_session("agent-b") is False
+    assert asyncio.run(instance.say_work_result("agent-a", "Tests passed")) is True
+    assert asyncio.run(instance.say_work_result("agent-b", "Wrong session")) is False
+    assert session.say_calls == [("Tests passed", "APPEND", True)]
+
+    asyncio.run(instance.stop("agent-a"))
+
+    assert instance.has_work_session("agent-a") is False
+    assert asyncio.run(instance.say_work_result("agent-a", "Too late")) is False
+    assert session.say_calls == [("Tests passed", "APPEND", True)]
+
+
+def test_baseline_session_is_not_eligible_for_work_delivery(fake_env, monkeypatch):
+    import agent
+
+    class FakeSession:
+        async def start(self):
+            return "agent-baseline"
+
+        async def say(self, *_args, **_kwargs):
+            raise AssertionError("baseline session must not receive Work delivery")
+
+        async def stop(self):
+            pass
+
+    monkeypatch.setattr(
+        AgoraAgent, "create_async_session", lambda self, **_kwargs: FakeSession()
+    )
+    instance = agent.Agent()
+    asyncio.run(instance.start(channel_name="ch", agent_uid=111, user_uid=222))
+
+    assert instance.has_work_session("agent-baseline") is False
+    assert (
+        asyncio.run(instance.say_work_result("agent-baseline", "Do not speak"))
+        is False
+    )
+
+
 def test_start_failure_revokes_pending_capability(fake_env, monkeypatch):
     import agent
 

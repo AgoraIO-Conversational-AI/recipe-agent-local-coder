@@ -117,6 +117,7 @@ async def test_start_and_status_return_safe_workspace_scoped_projections(tools_c
         "work_id": accepted["work_id"],
         "state": store.get(accepted["work_id"]).state,
     }
+    assert store.get(accepted["work_id"]).delivery_agent_id == "agent-a"
     acp.responses.put_nowait(AcpPromptResult("end_turn", "All tests passed"))
     await wait_until(lambda: store.get(accepted["work_id"]).state == "completed")
 
@@ -135,7 +136,13 @@ async def test_start_and_status_return_safe_workspace_scoped_projections(tools_c
         "pending_permission": None,
     }
     serialized = repr(status)
-    for forbidden in ("workspace_id", "primary_directory", "authorization_id"):
+    for forbidden in (
+        "workspace_id",
+        "primary_directory",
+        "authorization_id",
+        "delivery_agent_id",
+        "agent-a",
+    ):
         assert forbidden not in serialized
 
 

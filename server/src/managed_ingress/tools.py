@@ -62,7 +62,11 @@ class ManagedWorkTools:
             existing = self._store.find_by_idempotency(
                 binding.workspace_id, idempotency_key
             )
-            receipt = await self._runtime.start_work(objective, idempotency_key)
+            receipt = await self._runtime.start_work(
+                objective,
+                idempotency_key,
+                delivery_agent_id=binding.agora_agent_id,
+            )
         except (TaskRuntimeError, ValueError) as exc:
             return _public_error(exc)
         return {
