@@ -146,6 +146,107 @@ async def test_start_work_returns_after_persistence_and_completes_in_background(
 
 
 @pytest.mark.anyio
+async def test_completed_targeted_work_notifies_after_authoritative_commit(
+    runtime_context,
+):
+    context = runtime_context
+    observed = []
+
+    def terminal(work_id: str) -> None:
+        receipt = context.store.get(work_id)
+        observed.append((work_id, receipt.state, receipt.delivery_state))
+
+    context.runtime.set_terminal_callback(terminal)
+    accepted = await context.runtime.start_work(
+        "Run the tests",
+        "turn-delivery",
+        delivery_agent_id="agent-a",
+    )
+    await wait_until(
+        lambda: context.store.get(accepted.work_id).state == "running",
+        "running",
+    )
+    context.acp.complete("All tests passed.")
+
+    await wait_until(lambda: len(observed) == 1, "terminal callback")
+
+    assert observed == [
+        (accepted.work_id, "completed", "pending_delivery")
+    ]
+    assert context.store.get(accepted.work_id).delivery_agent_id == "agent-a"
+
+
+@pytest.mark.anyio
+async def test_failed_targeted_work_notifies_once_with_safe_committed_error(
+    runtime_context,
+):
+    context = runtime_context
+    observed = []
+
+    def terminal(work_id: str) -> None:
+        receipt = context.store.get(work_id)
+        observed.append(
+            (work_id, receipt.state, receipt.error, receipt.delivery_state)
+        )
+
+    context.runtime.set_terminal_callback(terminal)
+    context.acp.fail_next_prompt = ConnectionError("SECRET child failure")
+    accepted = await context.runtime.start_work(
+        "Fail safely",
+        "turn-failure-delivery",
+        delivery_agent_id="agent-a",
+    )
+
+    await wait_until(lambda: len(observed) == 1, "failure callback")
+
+    assert observed == [
+        (
+            accepted.work_id,
+            "failed",
+            "The coding Agent could not complete this Work.",
+            "pending_delivery",
+        )
+    ]
+
+
+@pytest.mark.anyio
+async def test_cancelled_and_duplicate_work_do_not_create_extra_notifications(
+    runtime_context,
+):
+    context = runtime_context
+    observed = []
+    context.runtime.set_terminal_callback(observed.append)
+    running = await context.runtime.start_work(
+        "Complete once",
+        "turn-once",
+        delivery_agent_id="agent-a",
+    )
+    duplicate = await context.runtime.start_work(
+        "Different duplicate",
+        "turn-once",
+        delivery_agent_id="agent-b",
+    )
+    cancelled = await context.runtime.start_work(
+        "Cancel me",
+        "turn-cancel-delivery",
+        delivery_agent_id="agent-a",
+    )
+    await context.runtime.cancel_work(cancelled.work_id)
+    await wait_until(
+        lambda: context.store.get(running.work_id).state == "running",
+        "running",
+    )
+    context.acp.complete("Completed once")
+
+    await wait_until(lambda: len(observed) == 1, "single callback")
+
+    assert duplicate.work_id == running.work_id
+    assert observed == [running.work_id]
+    assert context.store.get(running.work_id).delivery_agent_id == "agent-a"
+    assert context.store.get(cancelled.work_id).state == "cancelled"
+
+
+@pytest.mark.anyio
 async def test_queue_has_no_small_count_cap_and_executes_fifo_without_concurrency(
     runtime_context,
 ):

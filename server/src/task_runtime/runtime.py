@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import asyncio
+import logging
+from collections.abc import Callable
 from contextlib import suppress
 from typing import Any
 
@@ -35,6 +37,9 @@ _SWITCH_CONFLICT = (
     "Wait for the current Work or permission decision before changing Project Folder."
 )
 MAX_QUEUED_OBJECTIVE_BYTES = 1024 * 1024
+TerminalWorkCallback = Callable[[str], None]
+
+logger = logging.getLogger("uvicorn.error")
 
 
 class TaskRuntimeError(RuntimeError):
@@ -102,6 +107,7 @@ class TaskRuntime:
         store: WorkStore,
         permissions: PermissionBroker,
         max_queued_objective_bytes: int = MAX_QUEUED_OBJECTIVE_BYTES,
+        terminal_callback: TerminalWorkCallback | None = None,
     ) -> None:
         self._workspace = workspace
         self._readiness = readiness
@@ -109,6 +115,7 @@ class TaskRuntime:
         self.store = store
         self.permissions = permissions
         self.max_queued_objective_bytes = max_queued_objective_bytes
+        self._terminal_callback = terminal_callback
         self._queue: asyncio.Queue[str] = asyncio.Queue()
         self._worker: asyncio.Task[None] | None = None
         self._accepting = False
@@ -151,8 +158,16 @@ class TaskRuntime:
         self._active_work_id = None
         self.store.recover_nonterminal(_STOPPED_ERROR)
 
+    def set_terminal_callback(
+        self, callback: TerminalWorkCallback | None
+    ) -> None:
+        self._terminal_callback = callback
+
     async def start_work(
-        self, objective: str, idempotency_key: str
+        self,
+        objective: str,
+        idempotency_key: str,
+        delivery_agent_id: str | None = None,
     ) -> WorkReceipt:
         """Persist and enqueue one Work without awaiting ACP execution."""
         if not self._accepting:
@@ -182,6 +197,7 @@ class TaskRuntime:
                 workspace_id,
                 idempotency_key,
                 objective,
+                delivery_agent_id=delivery_agent_id,
             )
         except ValueError as exc:
             raise TaskRuntimeError("invalid_work_request") from exc
@@ -210,7 +226,7 @@ class TaskRuntime:
             try:
                 await self._acp.cancel()
             except Exception as exc:
-                self.store.transition(receipt.work_id, "failed", _WORK_ERROR)
+                self._fail_work(receipt.work_id)
                 raise TaskRuntimeError("work_cancellation_failed") from exc
         return cancelling
 
@@ -265,7 +281,7 @@ class TaskRuntime:
                 self._fail_work(current.work_id)
             return
         if current.state == "cancelling":
-            self.store.transition(current.work_id, "failed", _WORK_ERROR)
+            self._fail_work(current.work_id)
             return
         if result.stop_reason != "end_turn" or not result.final_text.strip():
             self._fail_work(current.work_id)
@@ -275,7 +291,8 @@ class TaskRuntime:
             inline=result.final_text,
         )
         self.store.save_final(current.work_id, presentation)
-        self.store.transition(current.work_id, "completed")
+        completed = self.store.transition(current.work_id, "completed")
+        self._notify_terminal(completed)
 
     def _fail_work(self, work_id: str) -> None:
         current = self.store.get(work_id)
@@ -286,7 +303,20 @@ class TaskRuntime:
         if current.state == "awaiting_permission":
             current = self.store.transition(current.work_id, "cancelling")
         if current.state in {"starting", "running", "cancelling"}:
-            self.store.transition(current.work_id, "failed", _WORK_ERROR)
+            failed = self.store.transition(current.work_id, "failed", _WORK_ERROR)
+            self._notify_terminal(failed)
+
+    def _notify_terminal(self, receipt: WorkReceipt) -> None:
+        callback = self._terminal_callback
+        if callback is None or receipt.delivery_agent_id is None:
+            return
+        try:
+            callback(receipt.work_id)
+        except Exception as exc:
+            logger.error(
+                "Failed to publish terminal Work notification error_type=%s",
+                type(exc).__name__,
+            )
 
     async def _wait_for_active_terminal(self, work_id: str) -> None:
         while self.store.get(work_id).state in NONTERMINAL_STATES:
