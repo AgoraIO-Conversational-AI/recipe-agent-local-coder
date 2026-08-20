@@ -33,6 +33,27 @@ def test_pending_lease_is_not_authorized_until_exact_agent_activation():
     assert registry.active_binding() is None
 
 
+def test_authenticate_distinguishes_pending_active_and_revoked_capabilities():
+    registry = CapabilityRegistry(
+        token_factory=lambda: "secret-bearer",
+        id_factory=lambda: "credential-a",
+    )
+    lease = registry.prepare("scope-a", 1)
+
+    pending = registry.authenticate(lease.bearer)
+    assert pending.state == "pending"
+    assert pending.binding is None
+    assert registry.resolve(lease.bearer) is None
+
+    binding = registry.activate(lease.lease_id, "agent-a")
+    active = registry.authenticate(lease.bearer)
+    assert active.state == "active"
+    assert active.binding == binding
+
+    registry.revoke(lease.lease_id)
+    assert registry.authenticate(lease.bearer) is None
+
+
 def test_registry_allows_only_one_pending_or_active_voice_agent():
     registry = CapabilityRegistry(
         token_factory=lambda: "secret-bearer",

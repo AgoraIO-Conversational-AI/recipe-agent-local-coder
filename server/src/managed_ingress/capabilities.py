@@ -10,6 +10,7 @@ import uuid
 from collections import defaultdict, deque
 from collections.abc import Callable
 from dataclasses import dataclass
+from typing import Literal
 
 from .models import CapabilityBinding, CapabilityLease
 
@@ -32,6 +33,14 @@ class CapabilityRegistryError(RuntimeError):
 
 class CapabilityLimitError(RuntimeError):
     """A fixed public budget failure."""
+
+
+@dataclass(frozen=True)
+class CapabilityAccess:
+    """Authenticate a pending handshake or an exact active Agent binding."""
+
+    state: Literal["pending", "active"]
+    binding: CapabilityBinding | None
 
 
 @dataclass
@@ -100,18 +109,26 @@ class CapabilityRegistry:
         )
         return record.binding
 
-    def resolve(self, bearer: str) -> CapabilityBinding | None:
+    def authenticate(self, bearer: str) -> CapabilityAccess | None:
         record = self._record
         if (
             record is None
             or record.revoked
-            or record.binding is None
             or not bearer
         ):
             return None
         if not hmac.compare_digest(record.bearer_digest, _digest(bearer)):
             return None
-        return record.binding
+        return CapabilityAccess(
+            state="active" if record.binding is not None else "pending",
+            binding=record.binding,
+        )
+
+    def resolve(self, bearer: str) -> CapabilityBinding | None:
+        access = self.authenticate(bearer)
+        if access is None or access.state != "active":
+            return None
+        return access.binding
 
     def revoke(self, lease_id: str) -> None:
         record = self._record
