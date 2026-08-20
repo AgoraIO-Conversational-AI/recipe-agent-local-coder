@@ -132,4 +132,5 @@ class WorkReceipt:
     updated_at: str
     final_presentation: FinalPresentation | None = None
     error: str | None = None
+    delivery_agent_id: str | None = None
     delivery_state: DeliveryState = "not_ready"

@@ -1,5 +1,6 @@
 """Durable Work Store behavior through its public interface."""
 
+import sqlite3
 import stat
 
 import pytest
@@ -30,6 +31,27 @@ def test_create_or_get_is_idempotent_within_one_workspace(store):
     assert first_created is True
     assert second_created is False
     assert second == first
+
+
+def test_delivery_agent_is_persisted_and_idempotent_work_is_not_retargeted(store):
+    first, first_created = store.create_or_get(
+        "scope-a",
+        "turn-delivery",
+        "Inspect",
+        delivery_agent_id="agent-a",
+    )
+    duplicate, duplicate_created = store.create_or_get(
+        "scope-a",
+        "turn-delivery",
+        "Different objective",
+        delivery_agent_id="agent-b",
+    )
+
+    assert first_created is True
+    assert duplicate_created is False
+    assert first.delivery_agent_id == "agent-a"
+    assert duplicate.delivery_agent_id == "agent-a"
+    assert store.get(first.work_id).delivery_agent_id == "agent-a"
 
 
 def test_same_idempotency_key_is_independent_across_workspaces(store):
@@ -140,6 +162,74 @@ def test_transition_persists_activity_permission_and_final_result(store):
     assert store.pending_permission("scope-a") is None
 
 
+def test_delivery_state_transitions_are_compare_and_set(store):
+    receipt, _ = store.create_or_get(
+        "scope-a",
+        "turn-delivery-state",
+        "Run tests",
+        delivery_agent_id="agent-a",
+    )
+    store.transition(receipt.work_id, "starting")
+    store.transition(receipt.work_id, "running")
+    store.save_final(
+        receipt.work_id,
+        FinalPresentation(speech="Tests passed.", inline="Tests passed."),
+    )
+
+    claimed = store.claim_delivery(receipt.work_id)
+
+    assert claimed is not None
+    assert claimed.delivery_state == "sending"
+    assert store.claim_delivery(receipt.work_id) is None
+    released = store.release_delivery(receipt.work_id)
+    assert released is not None
+    assert released.delivery_state == "pending_delivery"
+    assert store.claim_delivery(receipt.work_id).delivery_state == "sending"
+    accepted = store.mark_delivery_accepted(receipt.work_id)
+    assert accepted is not None
+    assert accepted.delivery_state == "accepted"
+    assert store.mark_delivery_unknown(receipt.work_id) is None
+    assert store.release_delivery(receipt.work_id) is None
+
+
+def test_delivery_unknown_is_terminal_for_automatic_delivery(store):
+    receipt, _ = store.create_or_get(
+        "scope-a",
+        "turn-delivery-unknown",
+        "Run tests",
+        delivery_agent_id="agent-a",
+    )
+    store.transition(receipt.work_id, "starting")
+    store.transition(receipt.work_id, "running")
+    store.save_final(
+        receipt.work_id,
+        FinalPresentation(speech="Tests passed.", inline=None),
+    )
+    assert store.mark_delivery_unknown(receipt.work_id) is None
+    assert store.claim_delivery(receipt.work_id).delivery_state == "sending"
+
+    unknown = store.mark_delivery_unknown(receipt.work_id)
+
+    assert unknown is not None
+    assert unknown.delivery_state == "delivery_unknown"
+    assert store.claim_delivery(receipt.work_id) is None
+
+
+def test_targeted_failure_becomes_pending_delivery_but_cancellation_does_not(store):
+    failed, _ = store.create_or_get(
+        "scope-a", "turn-failed", "Fail", delivery_agent_id="agent-a"
+    )
+    store.transition(failed.work_id, "starting")
+    failed = store.transition(failed.work_id, "failed", "Safe failure")
+    cancelled, _ = store.create_or_get(
+        "scope-a", "turn-cancelled", "Cancel", delivery_agent_id="agent-a"
+    )
+    cancelled = store.transition(cancelled.work_id, "cancelled")
+
+    assert failed.delivery_state == "pending_delivery"
+    assert cancelled.delivery_state == "not_ready"
+
+
 def test_restart_marks_every_nonterminal_work_failed(store):
     receipts = [
         store.create_or_get("scope-a", f"key-{index}", "Work")[0]
@@ -211,3 +301,60 @@ def test_database_reopens_with_private_permissions(tmp_path):
         assert stat.S_IMODE(path.parent.stat().st_mode) == 0o700
     finally:
         reopened.close()
+
+
+def test_version_1_database_is_upgraded_without_losing_work(tmp_path):
+    path = tmp_path / "state" / "work.sqlite3"
+    path.parent.mkdir()
+    connection = sqlite3.connect(path)
+    connection.executescript(
+        """
+        CREATE TABLE metadata (key TEXT PRIMARY KEY, value TEXT NOT NULL);
+        INSERT INTO metadata(key, value) VALUES('schema_version', '1.0');
+        CREATE TABLE works (
+          work_id TEXT PRIMARY KEY,
+          workspace_id TEXT NOT NULL,
+          idempotency_key TEXT NOT NULL,
+          objective TEXT NOT NULL,
+          state TEXT NOT NULL,
+          created_at TEXT NOT NULL,
+          updated_at TEXT NOT NULL,
+          speech TEXT,
+          inline TEXT,
+          error TEXT,
+          delivery_state TEXT NOT NULL,
+          UNIQUE(workspace_id, idempotency_key)
+        );
+        INSERT INTO works(
+          work_id, workspace_id, idempotency_key, objective, state,
+          created_at, updated_at, delivery_state
+        ) VALUES(
+          'work-old', 'scope-a', 'turn-old', 'Inspect', 'queued',
+          '2026-08-20T00:00:00Z', '2026-08-20T00:00:00Z', 'not_ready'
+        );
+        """
+    )
+    connection.commit()
+    connection.close()
+
+    upgraded = WorkStore(path)
+    try:
+        assert upgraded.get("work-old").objective == "Inspect"
+        assert upgraded.get("work-old").delivery_agent_id is None
+    finally:
+        upgraded.close()
+
+    inspection = sqlite3.connect(path)
+    inspection.row_factory = sqlite3.Row
+    try:
+        columns = {
+            row["name"] for row in inspection.execute("PRAGMA table_info(works)")
+        }
+        version = inspection.execute(
+            "SELECT value FROM metadata WHERE key = 'schema_version'"
+        ).fetchone()["value"]
+
+        assert "delivery_agent_id" in columns
+        assert version == "1.1"
+    finally:
+        inspection.close()

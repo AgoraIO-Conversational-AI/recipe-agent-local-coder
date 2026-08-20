@@ -23,7 +23,7 @@ from .models import (
 from .safety import redact_durable_text
 
 
-_SCHEMA_VERSION = "1.0"
+_SCHEMA_VERSION = "1.1"
 _STATE_ACTIVITY: dict[WorkState, tuple[str, str]] = {
     "queued": ("accepted", "Work accepted"),
     "starting": ("starting", "Starting work"),
@@ -92,6 +92,7 @@ class WorkStore:
                   workspace_id TEXT NOT NULL,
                   idempotency_key TEXT NOT NULL,
                   objective TEXT NOT NULL,
+                  delivery_agent_id TEXT,
                   state TEXT NOT NULL,
                   created_at TEXT NOT NULL,
                   updated_at TEXT NOT NULL,
@@ -130,6 +131,19 @@ class WorkStore:
                     "INSERT INTO metadata(key, value) VALUES('schema_version', ?)",
                     (_SCHEMA_VERSION,),
                 )
+            elif existing["value"] == "1.0":
+                columns = {
+                    row["name"]
+                    for row in self._connection.execute("PRAGMA table_info(works)")
+                }
+                if "delivery_agent_id" not in columns:
+                    self._connection.execute(
+                        "ALTER TABLE works ADD COLUMN delivery_agent_id TEXT"
+                    )
+                self._connection.execute(
+                    "UPDATE metadata SET value = ? WHERE key = 'schema_version'",
+                    (_SCHEMA_VERSION,),
+                )
             elif existing["value"] != _SCHEMA_VERSION:
                 raise ValueError("Unsupported Work Store schema version")
 
@@ -141,6 +155,7 @@ class WorkStore:
         workspace_id: str,
         idempotency_key: str,
         objective: str,
+        delivery_agent_id: str | None = None,
     ) -> tuple[WorkReceipt, bool]:
         workspace_id = _bounded(workspace_id, name="workspace_id", max_bytes=128)
         idempotency_key = _bounded(
@@ -150,6 +165,15 @@ class WorkStore:
             redact_durable_text(objective),
             name="objective",
             max_bytes=16 * 1024,
+        )
+        delivery_agent_id = (
+            _bounded(
+                delivery_agent_id,
+                name="delivery_agent_id",
+                max_bytes=128,
+            )
+            if delivery_agent_id is not None
+            else None
         )
         existing = self._connection.execute(
             "SELECT * FROM works WHERE workspace_id = ? AND idempotency_key = ?",
@@ -165,15 +189,17 @@ class WorkStore:
                 self._connection.execute(
                     """
                     INSERT INTO works(
-                      work_id, workspace_id, idempotency_key, objective, state,
+                      work_id, workspace_id, idempotency_key, objective,
+                      delivery_agent_id, state,
                       created_at, updated_at, delivery_state
-                    ) VALUES (?, ?, ?, ?, 'queued', ?, ?, 'not_ready')
+                    ) VALUES (?, ?, ?, ?, ?, 'queued', ?, ?, 'not_ready')
                     """,
                     (
                         work_id,
                         workspace_id,
                         idempotency_key,
                         objective,
+                        delivery_agent_id,
                         timestamp,
                         timestamp,
                     ),
@@ -255,8 +281,17 @@ class WorkStore:
         kind, label = _STATE_ACTIVITY[target]
         with self._connection:
             self._connection.execute(
-                "UPDATE works SET state = ?, updated_at = ?, error = ? WHERE work_id = ?",
-                (target, timestamp, safe_error, work_id),
+                """
+                UPDATE works
+                SET state = ?, updated_at = ?, error = ?,
+                    delivery_state = CASE
+                      WHEN ? = 'failed' AND delivery_agent_id IS NOT NULL
+                        THEN 'pending_delivery'
+                      ELSE delivery_state
+                    END
+                WHERE work_id = ?
+                """,
+                (target, timestamp, safe_error, target, work_id),
             )
             self._insert_activity(
                 work_id,
@@ -398,6 +433,24 @@ class WorkStore:
             )
         return self.get(work_id)
 
+    def claim_delivery(self, work_id: str) -> WorkReceipt | None:
+        return self._change_delivery(
+            work_id, source="pending_delivery", target="sending"
+        )
+
+    def release_delivery(self, work_id: str) -> WorkReceipt | None:
+        return self._change_delivery(
+            work_id, source="sending", target="pending_delivery"
+        )
+
+    def mark_delivery_accepted(self, work_id: str) -> WorkReceipt | None:
+        return self._change_delivery(work_id, source="sending", target="accepted")
+
+    def mark_delivery_unknown(self, work_id: str) -> WorkReceipt | None:
+        return self._change_delivery(
+            work_id, source="sending", target="delivery_unknown"
+        )
+
     def recover_nonterminal(self, error: str) -> list[WorkReceipt]:
         safe_error = _bounded(error, name="error", max_bytes=1024)
         rows = self._connection.execute(
@@ -411,7 +464,12 @@ class WorkStore:
                 self._connection.execute(
                     """
                     UPDATE works
-                    SET state = 'failed', updated_at = ?, error = ?
+                    SET state = 'failed', updated_at = ?, error = ?,
+                        delivery_state = CASE
+                          WHEN delivery_agent_id IS NOT NULL
+                            THEN 'pending_delivery'
+                          ELSE delivery_state
+                        END
                     WHERE work_id = ?
                     """,
                     (timestamp, safe_error, row["work_id"]),
@@ -449,6 +507,24 @@ class WorkStore:
         ).fetchall()
         return sum(len(str(row["objective"]).encode("utf-8")) for row in rows)
 
+    def _change_delivery(
+        self,
+        work_id: str,
+        *,
+        source: DeliveryState,
+        target: DeliveryState,
+    ) -> WorkReceipt | None:
+        with self._connection:
+            cursor = self._connection.execute(
+                """
+                UPDATE works
+                SET delivery_state = ?, updated_at = ?
+                WHERE work_id = ? AND delivery_state = ?
+                """,
+                (target, _now(), work_id, source),
+            )
+        return self.get(work_id) if cursor.rowcount == 1 else None
+
     def _insert_activity(
         self,
         work_id: str,
@@ -482,6 +558,7 @@ class WorkStore:
             updated_at=row["updated_at"],
             final_presentation=presentation,
             error=row["error"],
+            delivery_agent_id=row["delivery_agent_id"],
             delivery_state=row["delivery_state"],
         )
 
