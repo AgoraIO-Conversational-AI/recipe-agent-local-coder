@@ -7,6 +7,7 @@ from .capabilities import (
     CapabilityRegistryError,
 )
 from .models import CapabilityBinding, CapabilityLease, VoiceMcpLease
+from .delivery import WorkDeliveryCoordinator
 from .ngrok import NgrokCliTunnel, NgrokTunnelError, TunnelPort, TunnelStatus
 from .http_policy import IngressHostPolicy
 from .public_server import create_public_app
@@ -36,6 +37,7 @@ __all__ = [
     "TunnelStatus",
     "UvicornListener",
     "VoiceMcpLease",
+    "WorkDeliveryCoordinator",
     "WorkspaceGenerationPort",
     "create_public_app",
 ]
