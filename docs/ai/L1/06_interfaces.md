@@ -103,8 +103,12 @@ There is intentionally no `/local/work`, `/api/local/work`, SSE, or Activity
 Panel contract. The production public boundary is a separate `/mcp/` listener
 with exactly `start_work`, `get_work_status`, `cancel_work`, and
 `respond_permission`. It requires the in-memory bearer created for the current
-Agent and Workspace generation; caller-supplied identifiers are not accepted
-as tool authority.
+Agent creation; caller-supplied identifiers are not accepted as tool authority.
+Before Agora returns the real Agent ID, that pending bearer permits only
+`initialize`, `notifications/initialized`, `tools/list`, and `ping`. Pending
+non-handshake requests return HTTP `503 runtime_unavailable`. After exact Agent
+and Workspace-generation binding, the same bearer can call the four Work tools.
+Invalid or revoked bearers return HTTP `401 invalid_or_expired_capability`.
 
 ## Token Shape
 
