@@ -1,6 +1,6 @@
 # Agent Development Guide
 
-This guide is for coding agents making changes in `recipe-agent-acp-local`.
+This guide is for coding agents making changes in `recipe-agent-local-coder`.
 This repository is the **acp-local** derivative recipe in the Agora
 Conversational AI recipes family, derived from the `base` quickstart
 `agent-quickstart-python` (see [UPSTREAM.md](UPSTREAM.md)).

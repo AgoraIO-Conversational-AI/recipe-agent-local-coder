@@ -16,7 +16,7 @@ def create_mcp_server(
     # Dynamic Host/Origin policy is owned by the outer ASGI middleware because
     # the public ngrok hostname does not exist when FastMCP is constructed.
     mcp = FastMCP(
-        "recipe-agent-acp-local",
+        "recipe-agent-local-coder",
         instructions="Authenticated local coding Work tools.",
         streamable_http_path="/",
         stateless_http=True,
