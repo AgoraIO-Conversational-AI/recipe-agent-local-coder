@@ -71,9 +71,12 @@ def build_workspace_router(
                 service, runtime, resolved_guard, path
             )
         except HTTPException as exc:
-            raise BrowseSelectionFailed(
-                "Could not select the Project Folder"
-            ) from exc
+            detail = (
+                exc.detail
+                if isinstance(exc.detail, str)
+                else "Could not select the Project Folder"
+            )
+            raise BrowseSelectionFailed(detail) from exc
 
     browse_coordinator = WorkspaceBrowseCoordinator(picker, select_for_browse)
 

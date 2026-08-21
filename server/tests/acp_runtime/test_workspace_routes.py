@@ -314,6 +314,28 @@ def test_failed_activation_keeps_the_previous_workspace_selection(tmp_path):
     assert restored.json()["data"]["workspace"]["primary_directory"] == str(previous)
 
 
+def test_browse_activation_failure_preserves_actionable_runtime_reason(tmp_path):
+    project = tmp_path / "project"
+    project.mkdir()
+    app, picker, _runtime, fake_acp = make_app(tmp_path)
+    picker.result = str(project)
+    fake_acp.open_error = RuntimeError("missing executable")
+
+    with TestClient(app) as client:
+        started = client.post("/local/workspace/browse")
+        failed = wait_for_browse(
+            client, started.json()["data"]["operation_id"]
+        )
+        restored = client.get("/local/workspace")
+
+    assert failed["state"] == "failed"
+    assert failed["error"] == (
+        "Could not start the local Codex runtime. "
+        "Check the local runtime setup and retry."
+    )
+    assert restored.json()["data"]["state"] == "unconfigured"
+
+
 def test_switch_guard_blocks_before_persistence_or_acp_session_replacement(tmp_path):
     previous = tmp_path / "previous"
     next_project = tmp_path / "next"
