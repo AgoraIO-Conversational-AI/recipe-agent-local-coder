@@ -1,10 +1,13 @@
-# Agora Agent Service
+# Agora Voice Coder Python Service
 
-Agora Conversational AI Agent service built with FastAPI.
+The FastAPI backend for Agora Voice Coder. It owns Agora Agent lifecycle,
+Workspace settings, the local Task Runtime, authenticated MCP ingress, and the
+ACP coding-agent process boundary.
 
 ## Quick Start
 
-Use the repo-root [README.md](../README.md) for the normal full-stack local flow. This document is for working on the Python backend module directly.
+Use the repo-root [README.md](../README.md) for the product journey. This
+document is for working on the Python backend module directly.
 
 Recommended from the repo root.
 
@@ -20,16 +23,17 @@ Agora credentials:
 agora project env write server/.env.local
 ```
 
-Run the app:
-
-```bash
-bun run dev
-```
-
-For the local Codex foundation, run this from the repository root instead:
+Run Agora Voice Coder:
 
 ```bash
 bun run dev:codex
+```
+
+The inherited generic quickstart path remains available for upstream
+maintenance, but it does not start the Voice Coder local runtime:
+
+```bash
+bun run dev
 ```
 
 It binds FastAPI to `127.0.0.1:8000`, serves the web app on `127.0.0.1:3000`,
@@ -131,11 +135,19 @@ The service will start on port 8000 (or the port specified in `.env.local`).
 
 ## How This Fits The Repo
 
-- Full-stack local development: run `bun run dev` from the repo root. The browser still calls Next `/api/*`, and Next rewrites those requests to this FastAPI service.
+- Voice Coder product flow: run `bun run dev:codex` from the repo root. It owns
+  the loopback services, Project Folder, ACP session, Task Runtime, and ngrok
+  MCP ingress.
+- Inherited quickstart maintenance: `bun run dev` starts only the generic
+  Python-backed voice Agent path.
 - Module-local backend work: use the commands in this README when you only need to run or inspect the Python service itself.
-- Deployment: this Python service is required because the web app only forwards API requests through `AGENT_BACKEND_URL`.
+- Remote Voice Coder deployment is not supported.
 
-### 4. Test API
+### 4. Live API Checks
+
+`GET /get_config` is local and does not start an Agent. `POST /startAgent`
+starts a real Agora conversation and consumes minutes; run the start/stop checks
+only with explicit live-test authorization.
 
 ```bash
 # Test config generation

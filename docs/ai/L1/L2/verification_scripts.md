@@ -6,6 +6,7 @@
 
 | Layer                    | Script / Tool                                | Bun target                | What it asserts                                              |
 | ------------------------ | -------------------------------------------- | ------------------------- | ------------------------------------------------------------ |
+| Public repository boundary | `scripts/verify-public-repo.ts`            | `bun run verify:public-repo` | No local-only `docs/superpowers` path is tracked           |
 | Python compile + unit    | `compileall` + validation + ACP + Task Runtime + Managed ingress pytest | `bun run verify:backend`  | Python source compiles; all fake backend boundaries pass |
 | Web → Rewrite contract   | `web/scripts/verify-api-contracts.ts`        | `bun run verify:web:api`  | No `app/api` routes; `/api/*` rewrites + fetch shapes correct |
 | Web → rewrite stub       | `web/scripts/verify-local-proxy.ts`          | `bun run verify:web:proxy`| Imports `next.config.ts`, resolves rewrites, fetches an in-process stub directly |
@@ -13,7 +14,21 @@
 | Local launcher           | `scripts/verify-local-launcher.ts`           | `bun run verify:launcher` | Harmless child stubs prove single signal ownership, escalation, and residual cleanup |
 | Local preflight          | `scripts/local-codex-preflight.test.ts`      | `bun test scripts/local-codex-preflight.test.ts` | Certified platform/runtime/config rules without live services |
 
-`bun run verify` is the production-bound chain (`doctor` → `verify:web:api` → `verify:web:build`). `bun run verify:local` is the dev-bound chain (`doctor:local` → `verify:backend` → `verify:local:fastapi` → `verify:web:proxy` → `verify:web:build`).
+`bun run verify` is the portable public chain (`verify:public-repo` → `doctor`
+→ `verify:web:lint` → `verify:web:api` → `verify:web:build`). `bun run
+verify:local` is the complete local chain (`verify:public-repo` →
+`doctor:local` → `verify:backend` → `verify:local:fastapi` →
+`verify:web:proxy` → `verify:web:build`).
+
+## `verify-public-repo.ts`
+
+Purpose: prevent local workflow specs and plans from returning to the public
+branch through a forced Git add.
+
+The script asks Git for tracked paths below `docs/superpowers`, lists every
+violation, and exits nonzero when any are present. The directory remains in
+`.gitignore` so local planning files stay available without appearing in normal
+Git status. This check runs at the start of both `verify` and `verify:local`.
 
 ## `verify-api-contracts.ts`
 
@@ -154,6 +169,7 @@ Agora, ngrok, or the native picker.
 
 | Symptom                                                           | Cause                                                                |
 | ----------------------------------------------------------------- | -------------------------------------------------------------------- |
+| `verify-public-repo` lists workflow documents                     | A local-only `docs/superpowers` path was force-added; remove it from the Git index |
 | `verify-api-contracts` fails on "app/api should not exist"        | Someone added a Next route handler — remove it.                       |
 | `verify-local-proxy` hangs on `fetch`                             | Fake server failed to start; check the script's stderr.              |
 | `verify-local-fastapi` errors on import                           | `Agent.__init__` failed (env missing or SDK import error).            |
