@@ -1,4 +1,4 @@
-import type { BrowseOperationStatus, LocalRuntimeStatus, WorkspaceStatus } from '@/lib/workspace'
+import type { BrowseOperationStatus, BrowseWorkspaceOutcome, LocalRuntimeStatus, WorkspaceStatus } from '@/lib/workspace'
 
 const API_BASE_URL = '/api'
 
@@ -114,7 +114,7 @@ export async function startLocalRuntime(): Promise<LocalRuntimeStatus> {
 export async function browseWorkspace(options?: {
   pollIntervalMs?: number
   signal?: AbortSignal
-}): Promise<WorkspaceStatus> {
+}): Promise<BrowseWorkspaceOutcome> {
   const signal = options?.signal
   const pollIntervalMs = options?.pollIntervalMs ?? 300
   const started = await readLocalResponse<BrowseOperationStatus>(
@@ -138,14 +138,12 @@ export async function browseWorkspace(options?: {
   }
 
   if (operation.state === 'ready' && operation.workspace) {
-    return operation.workspace
+    return { state: 'ready', workspace: operation.workspace }
   }
-  throw new Error(
-    operation.error ||
-      (operation.state === 'cancelled'
-        ? 'Project Folder selection was cancelled'
-        : 'Could not select the Project Folder'),
-  )
+  if (operation.state === 'cancelled') {
+    return { state: 'cancelled' }
+  }
+  throw new Error(operation.error || 'Could not select the Project Folder')
 }
 
 function waitForPoll(milliseconds: number, signal?: AbortSignal): Promise<void> {

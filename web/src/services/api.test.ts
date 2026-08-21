@@ -169,9 +169,11 @@ test('browseWorkspace starts once and polls until the picker is ready', async ()
     },
   ])
 
-  const status = await browseWorkspace({ pollIntervalMs: 0 })
+  const outcome = await browseWorkspace({ pollIntervalMs: 0 })
 
-  expect(status.workspace?.primary_directory).toBe('/tmp/project')
+  expect(outcome.state).toBe('ready')
+  if (outcome.state !== 'ready') throw new Error('Expected ready browse outcome')
+  expect(outcome.workspace.workspace?.primary_directory).toBe('/tmp/project')
   expect(calls.map((call) => [call.url, call.init?.method])).toEqual([
     ['/api/local/workspace/browse', 'POST'],
     ['/api/local/workspace/browse/browse-1', 'GET'],
@@ -185,7 +187,7 @@ test('local helpers turn a non-JSON proxy failure into a bounded HTTP error', as
   await expect(getWorkspace()).rejects.toThrow('HTTP 500')
 })
 
-test('browseWorkspace reports a cancelled picker without changing Workspace', async () => {
+test('browseWorkspace returns a cancelled picker as a non-error outcome', async () => {
   mockFetchSequence([
     {
       status: 202,
@@ -205,7 +207,34 @@ test('browseWorkspace reports a cancelled picker without changing Workspace', as
     },
   ])
 
-  await expect(browseWorkspace({ pollIntervalMs: 0 })).rejects.toThrow('Project Folder selection was cancelled')
+  const outcome = await browseWorkspace({ pollIntervalMs: 0 })
+
+  expect(outcome).toEqual({ state: 'cancelled' })
+})
+
+test('browseWorkspace preserves an actionable failed operation message', async () => {
+  mockFetchSequence([
+    {
+      status: 202,
+      body: { code: 0, msg: 'success', data: { operation_id: 'browse-3', state: 'picking' } },
+    },
+    {
+      status: 200,
+      body: {
+        code: 0,
+        msg: 'success',
+        data: {
+          operation_id: 'browse-3',
+          state: 'failed',
+          error: 'Could not start the local Codex runtime. Check the local runtime setup and retry.',
+        },
+      },
+    },
+  ])
+
+  await expect(browseWorkspace({ pollIntervalMs: 0 })).rejects.toThrow(
+    'Could not start the local Codex runtime',
+  )
 })
 
 test('selectWorkspace sends the advanced manual path', async () => {
