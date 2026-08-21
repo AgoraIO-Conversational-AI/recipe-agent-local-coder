@@ -133,7 +133,7 @@ class NgrokCliTunnel:
             process.terminate()
             try:
                 await asyncio.wait_for(process.wait(), self._terminate_timeout)
-            except TimeoutError:
+            except asyncio.TimeoutError:
                 process.kill()
                 await process.wait()
 

@@ -68,7 +68,7 @@ class IngressHandlerTracker:
             return True
         try:
             await asyncio.wait_for(self._empty.wait(), timeout)
-        except TimeoutError:
+        except asyncio.TimeoutError:
             tasks = tuple(self._tasks)
             for task in tasks:
                 task.cancel()
@@ -113,7 +113,7 @@ class UvicornListener:
         self._server.should_exit = True
         try:
             await asyncio.wait_for(task, 2.0)
-        except TimeoutError:
+        except asyncio.TimeoutError:
             self._server.force_exit = True
             task.cancel()
             try:
