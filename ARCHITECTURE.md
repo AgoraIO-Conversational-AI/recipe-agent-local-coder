@@ -40,8 +40,9 @@ Browser Settings gate
 
 The browser opens Settings automatically when the Codex profile has no valid
 Project Folder. The native macOS picker is invoked by the loopback backend, not
-the browser. Picker cancellation returns to the blocking Settings gate without
-an error. A successful selection activates ACP, closes Settings automatically,
+the browser. Settings uses a native modal plus focus guards, so keyboard focus
+cannot reach the pre-call page while setup is blocking. Picker cancellation
+returns to the Settings gate without an error. A successful selection activates ACP, closes Settings automatically,
 and focuses **Start Conversation**; bounded activation failures remain in
 Settings with a retry action instead of being collapsed into a folder-selection
 error. `LandingPage` owns the initial checking gate and focus handoff, while

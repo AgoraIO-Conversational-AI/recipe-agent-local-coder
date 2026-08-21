@@ -1,6 +1,6 @@
 import { expect, test } from 'bun:test'
 
-import { getRuntimeStartBlock } from './local-runtime'
+import { getPreCallLocalAction } from './local-runtime'
 import type { LocalRuntimeStatus, WorkspaceStatus } from './workspace'
 import { applyBrowseOutcomeWithRuntimeRefresh, selectWorkspaceWithRuntimeRefresh } from './workspace-selection'
 
@@ -36,9 +36,9 @@ test('failed replacement invalidates stale ready runtime before Start Conversati
   ).rejects.toThrow('missing executable')
 
   expect(published).toEqual([null, failedRuntime])
-  const block = getRuntimeStartBlock(workspace, published.at(-1) ?? null)
-  if (!block) agoraCalls += 1
-  expect(block).toContain('missing executable')
+  const action = getPreCallLocalAction(true, workspace, published.at(-1) ?? null, false)
+  if (action.kind === 'start') agoraCalls += 1
+  expect(action.kind).toBe('configure')
   expect(agoraCalls).toBe(0)
 })
 

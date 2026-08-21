@@ -52,7 +52,9 @@ The sections below (Start Here, Patterns, Anti-Patterns, etc.) remain the canoni
   existing directory is selected and the local runtime reports `ready`.
   Initial checking disables the pre-call action, picker cancellation is a
   non-error, and successful setup closes Settings and focuses **Start
-  Conversation**. `LandingPage` owns that gate/focus handoff;
+  Conversation**. The native modal contains keyboard focus while the gate is
+  blocking, and the web layer synchronously rejects repeated picker starts.
+  `LandingPage` owns that gate/focus handoff;
   `ProjectFolderSettings` owns selection and actionable failure presentation.
 - The selected resolved directory is persisted in
   `~/Library/Application Support/Agora Voice ACP/workspace.json`, unless

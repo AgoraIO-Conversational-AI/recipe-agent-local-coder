@@ -77,8 +77,10 @@ The app loads Project Folder status first. While status is unknown, the pre-call
 action reads **Checking local setup…** and is disabled. Without a valid saved
 directory, Settings opens automatically and conversation start is blocked
 without creating an error. Select with the backend-owned native macOS picker or
-the advanced manual path. Cancelling the picker returns silently to Settings; a
-successful selection activates ACP, closes Settings, and focuses **Start
+the advanced manual path. The native modal contains keyboard focus, and a
+synchronous web guard prevents repeated clicks from starting concurrent picker
+operations. Cancelling the picker returns silently to Settings; a successful
+selection activates ACP, closes Settings, and focuses **Start
 Conversation** without another click. Bounded activation failures stay in
 Settings with **Try Again**. Do not describe the folder as a sandbox. A failed
 replacement restores the previous persisted selection.

@@ -87,3 +87,19 @@ Retested: 2026-05-28
 | `bun run verify:web:api` | Pass | API contract checks passed. |
 | `bun run verify:web:proxy` | Pass | Initial sandbox run could not bind local ports; rerun with escalation passed. |
 | `bun run verify:web` | Blocked | Doctor and API checks passed after `bun install`; `next build` failed because restricted network could not fetch Google Fonts for `next/font`. |
+
+## 2026-08-20 Project Folder Setup Acceptance
+
+This acceptance used mocked loopback Workspace/runtime responses only. It did
+not open the native picker, start ngrok, call Agora, or consume Agora minutes.
+
+| Check | Result | Evidence |
+| ----- | ------ | -------- |
+| Missing Workspace opens Settings automatically | Pass | The pre-call page rendered a native `dialog` with **Choose a Project Folder** and no start error. |
+| Modal contains keyboard focus | Pass | Eight forward Tab presses plus Shift+Tab kept `document.activeElement` inside the dialog. |
+| Picker cancellation is silent | Pass | The dialog stayed open without cancellation error copy. |
+| Failure remains actionable after cancellation | Pass | **Needs attention**, the bounded runtime error, and **Try Again** remained visible after a cancelled retry. |
+| Repeated click guard | Pass | Two synchronous button clicks produced one `POST /api/local/workspace/browse` request. |
+| Successful setup handoff | Pass | The dialog closed and focus moved to **Start Conversation** after a mocked ready outcome. |
+| Narrow layout | Pass | At 390 by 844 pixels, neither the document nor dialog overflowed horizontally. |
+| Browser errors | Pass | No new page errors were observed; the existing Agora logo aspect-ratio development warning remains unrelated. |

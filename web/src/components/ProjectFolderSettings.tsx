@@ -1,13 +1,17 @@
 'use client'
 
 import { FolderOpen, Loader2, Settings2, X } from 'lucide-react'
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 
 import { Button } from '@/components/ui/button'
 import type { LocalRuntimeStatus, WorkspaceStatus } from '@/lib/workspace'
 import { workspaceNeedsConfiguration } from '@/lib/workspace'
 import { applyBrowseOutcomeWithRuntimeRefresh, selectWorkspaceWithRuntimeRefresh } from '@/lib/workspace-selection'
 import { browseWorkspace, getLocalRuntime, selectWorkspace } from '@/services/api'
+
+type SelectionOutcome =
+  | { state: 'cancelled' }
+  | { state: 'ready'; workspace: WorkspaceStatus; runtime: LocalRuntimeStatus }
 
 type ProjectFolderSettingsProps = {
   open: boolean
@@ -31,73 +35,118 @@ export function ProjectFolderSettings({
   const [manualPath, setManualPath] = useState('')
   const [busyMode, setBusyMode] = useState<'browse' | 'manual' | null>(null)
   const [error, setError] = useState<string | null>(null)
-  const [hideInitialError, setHideInitialError] = useState(false)
+  const dialogRef = useRef<HTMLDialogElement>(null)
+  const selectionInFlightRef = useRef(false)
   const mustConfigure = status ? workspaceNeedsConfiguration(status) : true
   const canClose = !mustConfigure && runtimeStatus?.state === 'ready'
-  const visibleError = error ?? (hideInitialError ? null : initialError)
+  const visibleError = error ?? initialError
+  const setupReady = status?.state === 'ready' && runtimeStatus?.state === 'ready'
   const isBusy = busyMode !== null
 
   useEffect(() => {
     if (!open) {
       setBusyMode(null)
       setError(null)
-      setHideInitialError(false)
       setManualPath('')
+      selectionInFlightRef.current = false
     }
   }, [open])
 
   useEffect(() => {
-    if (!open || !canClose) return
-    const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') onClose()
+    const dialog = dialogRef.current
+    if (!open || !dialog) return
+    const getFocusable = () =>
+      Array.from(
+        dialog.querySelectorAll<HTMLElement>(
+          'button:not([disabled]), input:not([disabled]), summary, a[href], [tabindex]:not([tabindex="-1"]):not([data-focus-guard])',
+        ),
+      ).filter((element) => element.getClientRects().length > 0 && !element.dataset.focusGuard)
+    const retainKeyboardFocus = (event: FocusEvent) => {
+      const target = event.target
+      if (!(target instanceof HTMLElement)) return
+      const focusable = getFocusable()
+      if (!dialog.contains(target) || target.dataset.focusGuard === 'end') {
+        focusable[0]?.focus()
+      } else if (target.dataset.focusGuard === 'start') {
+        focusable[focusable.length - 1]?.focus()
+      }
     }
-    window.addEventListener('keydown', handleKeyDown)
-    return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [canClose, onClose, open])
+    document.addEventListener('focusin', retainKeyboardFocus, true)
+    if (!dialog.open) dialog.showModal()
+    const focusFrame = requestAnimationFrame(() => getFocusable()[0]?.focus())
+    return () => {
+      cancelAnimationFrame(focusFrame)
+      document.removeEventListener('focusin', retainKeyboardFocus, true)
+      if (dialog.open) dialog.close()
+    }
+  }, [open])
 
   if (!open) return null
 
-  const runSelection = async (select: () => Promise<WorkspaceStatus>) => {
-    setBusyMode('manual')
+  const runSelection = async (
+    mode: 'browse' | 'manual',
+    select: () => Promise<SelectionOutcome>,
+    fallbackMessage: string,
+  ) => {
+    if (selectionInFlightRef.current) return
+    selectionInFlightRef.current = true
+    const previousError = error
+    setBusyMode(mode)
     setError(null)
-    setHideInitialError(true)
     try {
-      const { workspace } = await selectWorkspaceWithRuntimeRefresh(select, getLocalRuntime, onRuntimeStatusChange)
-      onStatusChange(workspace)
+      const outcome = await select()
+      if (outcome.state === 'cancelled') {
+        setError(previousError)
+        return
+      }
+      onStatusChange(outcome.workspace)
     } catch (nextError) {
-      setError(nextError instanceof Error ? nextError.message : 'Could not select the Project Folder')
+      setError(nextError instanceof Error ? nextError.message : fallbackMessage)
     } finally {
+      selectionInFlightRef.current = false
       setBusyMode(null)
     }
   }
 
-  const runBrowseSelection = async () => {
-    setBusyMode('browse')
-    setError(null)
-    setHideInitialError(true)
-    try {
-      const outcome = await applyBrowseOutcomeWithRuntimeRefresh(
-        browseWorkspace,
-        getLocalRuntime,
-        onRuntimeStatusChange,
-      )
-      if (outcome.state === 'cancelled') return
-      onStatusChange(outcome.workspace)
-    } catch (nextError) {
-      setError(nextError instanceof Error ? nextError.message : 'Could not finish local setup')
-    } finally {
-      setBusyMode(null)
-    }
-  }
+  const runBrowseSelection = () =>
+    runSelection(
+      'browse',
+      () => applyBrowseOutcomeWithRuntimeRefresh(browseWorkspace, getLocalRuntime, onRuntimeStatusChange),
+      'Could not finish local setup',
+    )
+
+  const runManualSelection = (path: string) =>
+    runSelection(
+      'manual',
+      async () => ({
+        state: 'ready',
+        ...(await selectWorkspaceWithRuntimeRefresh(
+          () => selectWorkspace(path),
+          getLocalRuntime,
+          onRuntimeStatusChange,
+        )),
+      }),
+      'Could not select the Project Folder',
+    )
 
   return (
     <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/70 px-4 py-8 backdrop-blur-sm">
       <dialog
-        open
+        ref={dialogRef}
         aria-modal="true"
         aria-labelledby="project-folder-title"
-        className="relative m-0 w-full max-w-[32rem] rounded-[24px] border-0 bg-card p-6 text-left text-foreground shadow-[0_24px_80px_rgba(0,0,0,0.48),0_1px_0_rgba(255,255,255,0.06)_inset] md:p-7"
+        onCancel={(event) => {
+          event.preventDefault()
+          if (canClose) onClose()
+        }}
+        className="relative m-auto w-full max-w-[32rem] rounded-[24px] border-0 bg-card p-6 text-left text-foreground shadow-[0_24px_80px_rgba(0,0,0,0.48),0_1px_0_rgba(255,255,255,0.06)_inset] md:p-7"
       >
+        <button
+          type="button"
+          data-focus-guard="start"
+          aria-label="Return focus to the end of Project Folder settings"
+          className="fixed h-px w-px opacity-0"
+        />
         <header className="flex items-start justify-between gap-4">
           <div className="flex min-w-0 items-start gap-3">
             <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary">
@@ -153,10 +202,14 @@ export function ProjectFolderSettings({
               </div>
               <span
                 className={`rounded-full px-2.5 py-1 text-xs font-medium ${
-                  status?.state === 'ready' ? 'bg-emerald-500/10 text-emerald-400' : 'bg-amber-500/10 text-amber-300'
+                  setupReady
+                    ? 'bg-emerald-500/10 text-emerald-400'
+                    : visibleError
+                      ? 'bg-destructive/10 text-destructive'
+                      : 'bg-amber-500/10 text-amber-300'
                 }`}
               >
-                {status?.state === 'ready' ? 'Configured' : 'Required'}
+                {setupReady ? 'Configured' : visibleError ? 'Needs attention' : 'Required'}
               </span>
             </div>
 
@@ -177,7 +230,8 @@ export function ProjectFolderSettings({
 
         <Button
           type="button"
-          onClick={runBrowseSelection}
+          autoFocus
+          onClick={() => void runBrowseSelection()}
           disabled={isBusy}
           className="mt-6 h-11 w-full rounded-xl bg-primary font-medium text-primary-foreground transition-transform duration-150 hover:bg-primary/90 active:scale-[0.96]"
         >
@@ -198,7 +252,7 @@ export function ProjectFolderSettings({
             onSubmit={(event) => {
               event.preventDefault()
               const path = manualPath.trim()
-              if (path) runSelection(() => selectWorkspace(path))
+              if (path) void runManualSelection(path)
             }}
           >
             <label className="sr-only" htmlFor="manual-project-folder">
@@ -222,6 +276,12 @@ export function ProjectFolderSettings({
             </Button>
           </form>
         </details>
+        <button
+          type="button"
+          data-focus-guard="end"
+          aria-label="Return focus to the start of Project Folder settings"
+          className="fixed h-px w-px opacity-0"
+        />
       </dialog>
     </div>
   )
