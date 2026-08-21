@@ -1,6 +1,7 @@
 # 01 Setup
 
-> Local environment for the two-process Python + Next.js quickstart: prerequisites, env vars, and verification commands wired through the root `package.json` and `web/scripts/`.
+> Local environment for Agora Voice Coder: a macOS voice experience backed by
+> Next.js, FastAPI, an authenticated MCP ingress, and a local Codex ACP process.
 
 ## Prerequisites
 
@@ -11,6 +12,20 @@
 - Agora project with App ID + App Certificate.
 
 ## Install
+
+The primary consumer journey starts from this repository:
+
+```bash
+git clone https://github.com/AgoraIO-Conversational-AI/recipe-agent-voice-coder.git
+cd recipe-agent-voice-coder
+agora login
+agora project use <your-project>
+bun run setup
+agora project env write server/.env.local
+bun run dev:codex
+```
+
+The lower-level dependency setup is:
 
 ```bash
 bun install                # JS deps for the workspace, including web/
@@ -87,16 +102,17 @@ The SDK is lower-bounded at v2 — add an upper bound or exact pin if you need r
 ## Quick Commands
 
 ```bash
-bun run dev                    # setup:env → setup:deps → concurrently {backend, frontend}
-bun run dev:codex              # loopback FastAPI + Next with local Codex readiness gate
+bun run dev:codex              # primary macOS Voice Coder flow
+bun run dev                    # inherited generic quickstart maintenance flow
 bun run dev:backend            # python3 server/src/server.py
 bun run dev:frontend           # cd web && AGENT_BACKEND_URL=http://localhost:8000 bun run dev
 bun run doctor                 # bun + node_modules sanity
 bun run doctor:local           # adds python3 + .env.local + AGORA_* presence
 bun run preflight:codex        # platform/Bun/Node/Python/ngrok/Agora config, no secret output
 bun run build                  # bun --filter web build
-bun run verify                 # doctor + verify:web:api + verify:web:build
-bun run verify:local           # doctor:local + verify:backend + verify:local:fastapi + verify:web:proxy + verify:web:build
+bun run verify:public-repo     # fail if local-only workflow plans are tracked
+bun run verify                 # public boundary + doctor + web API/lint/build
+bun run verify:local           # public boundary + complete local offline chain
 bun run verify:backend         # compile server/src and run all offline Python suites
 bun run verify:web:api         # web/scripts/verify-api-contracts.ts
 bun run verify:web:proxy       # web/scripts/verify-local-proxy.ts
@@ -130,7 +146,7 @@ group. Terminal closure is handled as SIGHUP cleanup. Interrupted statuses are
 | `bun run dev:codex`           | No (until Start conversation) | Starts local services; Agent preparation then starts ngrok |
 | `cd server && ... pytest -q`  | No          | ACP tests inject fakes; no real `npx` or browser auth |
 
-## Local Codex Setup
+## Local Voice Coder Setup
 
 Run `bun run dev:codex`, then choose a Project Folder in the automatically
 opened Settings gate. The backend opens the native macOS picker; manual path

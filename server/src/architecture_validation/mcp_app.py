@@ -83,7 +83,7 @@ def create_mcp_server(
         allowed_hosts.append(public_host)
         allowed_origins.append(f"https://{public_host}")
     mcp = FastMCP(
-        "recipe-agent-local-coder-validation",
+        "recipe-agent-voice-coder-validation",
         instructions="Validation-only tools. No ACP or local code execution occurs.",
         streamable_http_path="/",
         stateless_http=True,

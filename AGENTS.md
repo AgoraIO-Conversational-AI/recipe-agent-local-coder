@@ -1,6 +1,6 @@
 # Agent Development Guide
 
-This guide is for coding agents making changes in `recipe-agent-local-coder`.
+This guide is for coding agents making changes in `recipe-agent-voice-coder`.
 This repository is the **acp-local** derivative recipe in the Agora
 Conversational AI recipes family, derived from the `base` quickstart
 `agent-quickstart-python` (see [UPSTREAM.md](UPSTREAM.md)).
@@ -93,7 +93,10 @@ The sections below (Start Here, Patterns, Anti-Patterns, etc.) remain the canoni
 - Keep the corpus controls and shared MCP tools stable. Raw evidence stays local.
 - This harness does not implement ACP, Codex execution, or the production Task Runtime.
 
-### Deployment
+### Inherited Deployment Path (not Voice Coder)
+
+The Voice Coder product path is local-only. The following split deployment is
+retained solely for maintaining the upstream quickstart surface:
 
 - Deploy `web` as a Next.js app.
 - Deploy or provide a reachable Python FastAPI backend.

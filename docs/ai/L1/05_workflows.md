@@ -30,7 +30,12 @@ Edit `server/src/agent.py`:
 
 After editing, run `bun run verify:backend && bun run verify:web:api`.
 
-## Deploy the Web and Backend Separately
+## Maintain the Inherited Deployable Quickstart Path
+
+The shipped Voice Coder experience is local-only because it depends on a local
+Project Folder, ACP child process, and Agent-native authentication. The
+following split deployment remains upstream-maintenance context for the
+inherited generic quickstart path; it is not the Voice Coder product journey.
 
 - **Web (Next.js):** build via `cd web && bun run build`. Configure `AGENT_BACKEND_URL` on the deploy target to the public URL of your FastAPI service. Serve with `bun run start` or any Node hosting platform.
 - **Backend (FastAPI):** install deps from `server/requirements.txt`, set `AGORA_APP_ID`, `AGORA_APP_CERTIFICATE`, optional `AGENT_GREETING`/`HOST`/`PORT`, and run `python3 server/src/server.py` or `uvicorn server.src.server:app --host 0.0.0.0 --port $PORT`.
@@ -50,7 +55,7 @@ bun run verify              # alias for production-bound web checks
 bun run verify:local        # full chain including backend + fastapi + proxy + build
 ```
 
-## Run `bun run dev`
+## Run the Inherited `bun run dev` Path
 
 ```bash
 bun run dev
@@ -62,7 +67,7 @@ bun run dev
 
 `concurrently` propagates Ctrl-C to both processes. If one crashes, both exit.
 
-## Run the Local Codex Foundation
+## Run Agora Voice Coder
 
 ```bash
 bun run dev:codex
@@ -125,7 +130,7 @@ If you change runtime behavior, also update:
 4. Preserve the recipe invariants in `docs/ai/RECIPE.md`.
 5. Run the verification commands before publishing a derivative.
 
-## Roll Back a Bad Deploy
+## Roll Back the Inherited Deployable Path
 
 - **Web:** redeploy the previous Next build on the host platform.
 - **Backend:** redeploy the previous Python source tarball or container. FastAPI is a single-process service — restart with the older artifact.

@@ -1,147 +1,153 @@
-# Agora Conversational AI Python Quickstart
+# Agora Voice Coder
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](./LICENSE)
 [![Python](https://img.shields.io/badge/python-%3E%3D3.10-blue)](https://www.python.org/)
 [![Bun](https://img.shields.io/badge/bun-latest-black)](https://bun.sh/)
 
-Build a production-style voice agent with a Next.js web client and Python FastAPI backend. This quickstart includes live transcript, agent visualizer ([Agent UIKit](https://agoraio-conversational-ai.github.io/agent-uikit/)), and managed STT/LLM/TTS defaults.
+Control a local coding agent through an Agora voice conversation.
 
-> This derivative uses Agora's Managed Voice LLM path. Its isolated evidence harness under `server/src/architecture_validation/` exercises synthetic MCP and permission behavior only; it does not execute ACP or local coding work. See [`validation/README.md`](validation/README.md).
+Speak naturally while Agora handles the realtime voice experience. When a
+request depends on your selected Project Folder, the voice agent delegates the
+work to a local coding agent over the [Agent Client Protocol
+(ACP)](https://agentclientprotocol.com/), keeps you in control of permissions
+and cancellation, and speaks the result when it is done.
+
+## What It Does
+
+- Runs the coding agent locally against one selected Project Folder.
+- Uses Agora Managed STT, LLM, and TTS for the voice conversation.
+- Delegates durable background Work through authenticated MCP tools.
+- Relays coding-agent permission decisions through the voice conversation.
+- Supports status checks, cancellation, and spoken completion results.
+
+## Current Support
+
+- macOS on Apple Silicon
+- Codex through a pinned ACP adapter
+- Claude Code is the next planned Agent Profile; it is not included yet.
 
 ## Prerequisites
 
 - [Python 3.10+](https://www.python.org/)
 - [Bun](https://bun.sh/)
 - [Agora CLI](https://github.com/AgoraIO/cli)
+- [ngrok](https://ngrok.com/)
+- Codex authentication supported by the pinned ACP adapter (ChatGPT or API key)
 
 ## Run It
 
-Install the CLI (skip if already installed), scaffold the Python quickstart, install dependencies, and run.
-
-1. **Install the Agora CLI and sign in** (skip if `agora` is already on your PATH):
-
-   ```bash
-   curl -fsSL https://raw.githubusercontent.com/AgoraIO/cli/main/install.sh | sh -s -- --add-to-path
-   agora login
-   ```
-
-2. **Scaffold and run** (replace `my-python-demo` with your own project name):
-
-   ```bash
-   agora init my-python-demo --template python
-   cd my-python-demo
-   bun run setup
-   bun run dev
-   ```
-
-3. Open [http://localhost:3000](http://localhost:3000) and click **Start conversation**.
-
-If the agent does not join or transcripts do not appear, run **`agora project doctor --deep`** to check credentials, feature enablement, network reachability, and local env binding.
-
-### Working from a clone of this repository
-
-Use this path if you already cloned **this** repo:
-
 ```bash
-git clone https://github.com/AgoraIO-Conversational-AI/agent-quickstart-python.git
-cd agent-quickstart-python
+git clone https://github.com/AgoraIO-Conversational-AI/recipe-agent-voice-coder.git
+cd recipe-agent-voice-coder
+
 agora login
 agora project use <your-project>
 bun run setup
 agora project env write server/.env.local
-bun run doctor:local
-bun run dev
-```
 
-Services:
+# One-time ngrok account setup, if it is not already configured:
+ngrok config add-authtoken <your-token>
 
-- Frontend: `http://localhost:3000`
-- Backend: `http://localhost:8000`
-- API docs: `http://localhost:8000/docs`
-
-### Run the local Codex foundation
-
-`bun run dev:codex` starts the loopback-only FastAPI backend on
-`127.0.0.1:8000` and the Next.js app on `127.0.0.1:3000`. It performs the
-normal dependency checks first, verifies macOS Apple Silicon, Bun/Node/Python,
-and usable Agora credentials without printing their values, then supervises
-both processes so either child stopping also stops its sibling.
-
-The Local Launcher Supervisor owns terminal signals once. The first Ctrl-C
-gracefully stops both services; a deliberate second Ctrl-C or the 10-second
-shutdown deadline forces cleanup of the isolated local process group. Closing
-the terminal follows the same cleanup path, so backend, frontend, ACP, and
-picker descendants do not remain in the background. Interrupted exits use
-`130` for SIGINT, `143` for SIGTERM, `129` for SIGHUP, and `137` after forced
-cleanup.
-
-```bash
 bun run dev:codex
 ```
 
-The opted-in backend now includes the offline-tested **Task Runtime Core**. It
-persists Workspace-scoped Work receipts in `work.sqlite3`, executes ACP prompts
-through one FIFO worker, stores bounded activity and final text, correlates one
-current-operation permission, confirms cancellation, and fails interrupted
-Work safely after restart.
+Open [http://127.0.0.1:3000](http://127.0.0.1:3000). On first launch, select an
+existing **Project Folder**, then start a conversation and ask for an outcome in
+natural language. Starting a conversation uses Agora minutes; setup and offline
+verification do not.
 
-The local app now connects that core to Agora's Managed Voice LLM through an
-authenticated, launcher-owned ngrok MCP ingress. **Start conversation** prepares
-the dedicated MCP listener, starts ngrok after ACP is ready, issues one
-per-Agent bearer, and injects exactly four Work tools. ngrok exposes only the
-MCP listener; ACP remains local stdio.
+The first Codex request reuses existing credentials when possible. If Codex ACP
+reports that authentication is required, complete its advertised ChatGPT login
+flow and retry.
 
-The Managed Voice LLM is told that the selected Project Folder and registered
-tools are capabilities it can use. It delegates Workspace-dependent requests
-to `start_work` as natural-language objectives without requiring commands or
-using a preset task-category list.
+Services started by `bun run dev:codex`:
 
-Agora may begin MCP discovery before Agent creation returns its real Agent ID.
-During that short pending phase, the bearer can authenticate only the
-side-effect-free MCP handshake; every Work tool remains unavailable until the
-backend binds the exact Agent ID.
+- Web app: `http://127.0.0.1:3000`
+- Local API: `http://127.0.0.1:8000`
+- Private MCP listener: `http://127.0.0.1:8001`
 
-Install ngrok and complete `ngrok config add-authtoken ...` once before the
-first run. The bearer, full MCP configuration, Workspace path, and internal ACP
-identifiers are never returned to the browser or persisted. Ending the Agent or
-launcher revokes the bearer before stopping the tunnel.
-
-Completed and failed Work now asks the exact originating active Agora Agent to
-speak the stored safe result with APPEND priority. A successful request records
-`accepted`; it does not prove playback completed. If that Agent has ended, the
-Workspace changed, or submission has an unknown outcome, the durable result
-remains available through `get_work_status` and is never replayed into a newer
-session automatically. SSE activity, the read-only task panel, proactive
-permission announcements, playback receipts, and reconnect replay remain
-follow-on slices.
-
-On first launch, the app opens a blocking **Project Folder** Settings gate.
-Choose an existing folder with the native macOS picker (or use the advanced
-path field). The resolved folder is persisted at
-`~/Library/Application Support/Agora Voice ACP/workspace.json`, unless
-`VOICE_ACP_STATE_DIR` selects a different state directory. A valid saved folder
-lets the local web flow explicitly activate one ACP session after both services
-start; ordinary FastAPI startup never launches, downloads, or authenticates
-ACP. Changing or clearing the folder closes the active session first. A failed
-replacement retains the previous saved folder.
-
-Project Folder is ACP session context for resolving work and relative paths. It
-is **not** a filesystem sandbox and does not limit what the child process can
-access. The v0.1 Codex profile supports one primary directory and no additional
-directories.
-
-The default child command is pinned and on-demand:
+## How It Works
 
 ```text
-npx -y @agentclientprotocol/codex-acp@1.1.7
+Voice -> Agora Managed STT / LLM / TTS
+      -> authenticated MCP over ngrok
+      -> local Task Runtime
+      -> selected Project Folder
+      -> ACP over local stdio
+      -> local Codex
 ```
 
-The client first tries to create a session with reusable Codex credentials. If
-ACP returns its typed authentication-required response, the client uses the
-advertised `ChatGPT` method and retries session creation once.
+1. The browser joins an Agora RTC/RTM channel and starts a managed voice Agent.
+2. The managed LLM receives four authenticated Work tools: start, status,
+   cancel, and permission response.
+3. Workspace-dependent requests become natural-language Work objectives. The
+   public tool returns immediately while the local FIFO Task Runtime executes
+   the objective through ACP.
+4. Codex activity and permission requests are converted into bounded,
+   voice-safe state. Permission decisions remain explicit.
+5. Completed or failed Work is submitted once to the originating active voice
+   Agent. Durable status remains authoritative if speech is unavailable or its
+   delivery outcome is uncertain.
 
-Advanced launch options do not bypass Project Folder validation or select full
-access:
+## Safety and Privacy
+
+- Only the authenticated MCP listener crosses the ngrok tunnel. The local API,
+  Project Folder routes, ACP session, and coding-agent process remain loopback
+  or local-only.
+- Every voice Agent receives a short-lived bearer bound to its exact Agent and
+  Workspace generation. Ending the Agent revokes that capability.
+- The Project Folder is working context, **not a filesystem sandbox**. The
+  local coding agent retains the access allowed by its own process and account.
+- The Project Folder path is shown only in the loopback settings UI. ACP
+  identifiers, credentials, and full MCP configuration are not returned to the
+  browser or included in public MCP results.
+- Local Work state is stored in SQLite. Public status output is bounded and
+  durable text is redacted before storage.
+- Agent-native authentication and provider billing remain between you and the
+  selected coding agent.
+
+## Environment Variables
+
+Primary backend environment file: [`server/.env.example`](server/.env.example).
+
+| Variable | Required | Default | Notes |
+| --- | :---: | --- | --- |
+| `AGORA_APP_ID` | Yes | — | Agora project App ID |
+| `AGORA_APP_CERTIFICATE` | Yes | — | Server-only Agora App Certificate |
+| `AGENT_GREETING` | No | Built in | Opening voice message |
+| `VOICE_ACP_STATE_DIR` | No | macOS Application Support | Workspace and Work state parent directory |
+| `HOST` | No | `0.0.0.0` | `dev:codex` always binds the local API to `127.0.0.1` |
+| `PORT` | No | `8000` | Local API port |
+| `CODEX_PATH` | No | Packaged Codex | Advanced Codex binary override passed only to the ACP child |
+| `CODEX_API_KEY` | No | — | Advanced child-process credential pass-through |
+| `OPENAI_API_KEY` | No | — | Advanced child-process credential pass-through |
+| `VOICE_ACP_COMMAND_JSON` | No | Pinned adapter | Advanced JSON argv array; never evaluated by a shell |
+
+Agora manages the default voice STT, LLM, and TTS providers, so the voice
+pipeline does not require separate provider keys. Per-Agent MCP credentials are
+generated at runtime and are not developer-managed environment variables.
+
+## Commands
+
+```bash
+# Setup and local run
+bun run setup
+bun run doctor:local
+bun run preflight:codex
+bun run dev:codex
+
+# Offline verification
+bun run verify
+bun run verify:backend
+bun run verify:local
+bun run verify:launcher
+```
+
+Offline checks use fake ACP, ngrok, voice Agent, and FastAPI paths. They do not
+start a conversation, open the native picker, authenticate a real coding agent,
+or consume Agora minutes.
+
+### Advanced ACP launch options
 
 ```bash
 bun run dev:codex -- --workspace /absolute/path/to/project
@@ -151,144 +157,72 @@ OPENAI_API_KEY=... bun run dev:codex
 bun run dev:codex -- --acp-command-json '["/absolute/path/to/acp-agent","--stdio"]'
 ```
 
-`CODEX_PATH`, `CODEX_API_KEY`, and `OPENAI_API_KEY` are passed only to the ACP
-child. The custom command is parsed only as a JSON argv array and is never run
-through a shell. Secret values and child-command environments are never logged.
+The custom command must be a JSON argv array and is never run through a shell.
+These options do not bypass Project Folder validation or change the default
+Agent mode. Secret values and child environments are never logged.
 
-## Deploy
+### Managed voice validation harness
 
-Deploy `web` as a Next.js app and `server` as a reachable Python service.
-
-Browser-facing `/api/*` routes in Next proxy to FastAPI via:
-
-```bash
-AGENT_BACKEND_URL=https://your-python-backend.example.com
-```
-
-Set backend env values:
-
-```bash
-AGORA_APP_ID=your_agora_app_id
-AGORA_APP_CERTIFICATE=your_agora_app_certificate
-AGENT_GREETING=optional_custom_greeting
-```
-
-To export local env values from the Agora CLI-bound project:
-
-```bash
-agora project use <your-project>
-agora project env write server/.env.local
-rg "^(AGORA_APP_ID|AGORA_APP_CERTIFICATE)=" server/.env.local
-```
-
-## Environment variables
-
-Primary backend env file: [`server/.env.example`](server/.env.example).
-
-| Variable | Required | Default | Notes |
-| --- | :---: | :---: | --- |
-| `AGORA_APP_ID` | ✅ | — | Agora Console -> Project -> App ID |
-| `AGORA_APP_CERTIFICATE` | ✅ | — | Agora Console -> Project -> App Certificate (server only) |
-| `AGENT_GREETING` |  | built-in greeting | Optional opening line override |
-| `HOST` |  | `0.0.0.0` | FastAPI bind host; `dev:codex` fixes this to `127.0.0.1` |
-| `PORT` |  | `8000` | FastAPI server port |
-| `AGENT_BACKEND_URL` (web deploy) | ✅ | — | Required in deployed `web` app when proxying to external FastAPI |
-| `VOICE_ACP_STATE_DIR` |  | macOS Application Support | Local Workspace state parent directory |
-| `CODEX_PATH` |  | packaged Codex | Advanced Codex binary override passed to ACP |
-| `CODEX_API_KEY`, `OPENAI_API_KEY` |  | — | Advanced child-process pass-through; values are never logged |
-| `VOICE_ACP_COMMAND_JSON` |  | pinned ACP command | Advanced JSON argv array; prefer `--acp-command-json` |
-
-Architecture-evidence variables are documented in `server/.env.example`. Per-session MCP capabilities are generated at runtime and are never developer-managed environment variables. `VALIDATION_MODEL` must match the controls in `validation/corpus.json`.
-
-> **Default vs BYOK** — this quickstart defaults to Agora-managed STT + LLM + TTS in the backend. Enable BYOK by uncommenting provider blocks in `server/src/agent.py` and adding matching keys.
-
-## Commands
-
-```bash
-# Dev
-bun run setup
-bun run dev
-bun run dev:codex
-
-# Quality
-bun run doctor
-bun run doctor:local
-bun run preflight:codex
-bun run verify:backend
-bun run verify:launcher
-
-# CI / pre-ship
-bun run verify:web
-bun run verify:local
-bun run verify
-```
-
-Run `bun run verify` before shipping web-only changes, and `bun run verify:local` when backend behavior changed.
-
-Offline checks use fake ACP, ngrok, Agent, and FastAPI/proxy paths; they
-do not execute the pinned `npx` command, authenticate in a browser, open the
-native picker, start an Agora conversation, or open ngrok. Those are live/manual
-checks. Tests run standalone: `pytest` in `server/`, `bun test` in `web/`. CI
-runs them on Linux/macOS/Windows × Python 3.10 & 3.13.
-
-`bun run verify:launcher` uses harmless child stubs to exercise terminal signal
-ownership, forced cleanup, and residual descendants. It does not start Agora or
-consume conversation minutes. `LOCAL_LAUNCHER_GRACE_SECONDS` is only a private
-verification seam for shortening its deadline, not an end-user setting.
+`bun run validate:managed` is an isolated architecture-evidence harness. It
+uses synthetic MCP and permission behavior and does not execute local coding
+Work. It starts a real Agora Agent and therefore requires separate permission
+when conversation minutes are limited. See [`validation/README.md`](validation/README.md).
 
 ## Architecture
 
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="./.github/images/system-architecture-dark.svg">
-  <img src="./.github/images/system-architecture.svg" alt="System architecture">
+  <img src="./.github/images/system-architecture.svg" alt="Agora Voice Coder system architecture">
 </picture>
 
-The browser talks to Next.js `/api/*` routes. In local mode, Next rewrites those routes to FastAPI using `AGENT_BACKEND_URL=http://localhost:8000`; FastAPI owns token generation and agent start/stop logic.
+The web client owns RTC/RTM and the visible conversation. FastAPI owns Agora
+tokens, Agent lifecycle, Workspace settings, the Task Runtime, and the private
+MCP listener. The launcher owns the frontend, backend, ngrok, native picker,
+and ACP child-process lifecycle so one shutdown cleans up the complete local
+process group.
 
-The derivative local-runtime extension adds loopback-only Project Folder and
-readiness routes under `/api/local/*`. Next registers them only for the
-explicit local-development opt-in with a loopback backend, and never in a
-production build. It does not change the stable quickstart routes or make ACP,
-Codex, or the Project Folder public browser APIs.
+The selected Project Folder is persisted at
+`~/Library/Application Support/Agora Voice ACP/workspace.json` unless
+`VOICE_ACP_STATE_DIR` overrides the state directory. This compatibility path
+does not change when the repository is renamed.
 
-## What You Get
+The default ACP command is pinned and launched on demand:
 
-- Next.js web client (`web/`) with transcript UI and agent visualizer
-- FastAPI backend (`server/`) for token generation and agent lifecycle
-- `/api/get_config`, `/api/startAgent`, and `/api/stopAgent` browser-facing contract
-- A local Codex readiness gate with persisted Project Folder context and one ACP child-process session
-- Managed default pipeline (Deepgram STT, OpenAI LLM, MiniMax TTS)
+```text
+npx -y @agentclientprotocol/codex-acp@1.1.7
+```
 
-## How It Works
-
-1. Browser requests connection config from `/api/get_config`.
-2. Backend generates combined RTC+RTM config and returns channel + token.
-3. Browser joins RTC/RTM and starts streaming audio.
-4. Browser calls `/api/startAgent`; backend starts the cloud agent session.
-5. Browser receives transcript and state updates over RTM, and `/api/stopAgent` ends the session.
+See [ARCHITECTURE.md](./ARCHITECTURE.md) for component boundaries and
+[docs/ai/L1/02_architecture.md](./docs/ai/L1/02_architecture.md) for the detailed
+lifecycle.
 
 ## Repo Map
 
-- `web/` — Next.js 16 + React 19 + TypeScript frontend
-- `server/` — Python FastAPI backend + Agora Agent Server SDK integration
-- `ARCHITECTURE.md` — system-level flow and ownership boundaries
-- `AGENTS.md` — contributor agent instructions
+- `web/` — Next.js conversation UI and RTC/RTM lifecycle
+- `server/src/agent.py` — Agora voice Agent lifecycle and managed provider setup
+- `server/src/managed_ingress/` — authenticated MCP ingress and Work tools
+- `server/src/task_runtime/` — durable Work, permissions, cancellation, and delivery
+- `server/src/acp_runtime/` — Project Folder state and local Codex ACP client
+- `scripts/` — setup, verification, and supervised local launcher
+- `validation/` — optional architecture-evidence corpus and local results
 
 ## Troubleshooting
 
-- **Agent does not join or transcripts are missing:** run `agora project doctor --deep`.
-- **Missing credentials:** run `agora project env write server/.env.local`.
-- **Auth errors from backend:** confirm `AGORA_APP_ID` and `AGORA_APP_CERTIFICATE` are set in `server/.env.local`.
-- **Frontend cannot reach backend:** confirm `AGENT_BACKEND_URL=http://localhost:8000` in local frontend scripts.
-- **Unsure who owns `/api/*`:** Next owns browser-facing `/api/*`; FastAPI owns `/get_config`, `/startAgent`, `/stopAgent`.
-- **Project Folder gate is blocked:** choose an existing directory. If the local runtime asks for authentication, complete the advertised ChatGPT sign-in flow and retry. This quickstart does not validate that live flow offline.
+| Problem | Fix |
+| --- | --- |
+| Setup or credentials are incomplete | Run `bun run doctor:local` and `bun run preflight:codex`. |
+| Agent greets but does not start Work | Confirm ngrok is authenticated, then restart and check that the selected Project Folder reports ready. |
+| Project Folder settings remain open | Select an existing directory; the folder is validated by the local backend. |
+| Codex requests authentication | Complete the advertised ChatGPT flow, or configure a supported child-process API key. |
+| Port 3000 is already in use | Stop the exact process using that port, then run `bun run dev:codex` again. |
+| A previous terminal closed unexpectedly | Restart the launcher; interrupted nonterminal Work is marked failed rather than silently resumed. |
+| You need the latest result again | Ask for Work status; spoken delivery is intentionally not replayed into a newer Agent session. |
 
-## More Docs
+## Upstream
 
-- [ARCHITECTURE.md](./ARCHITECTURE.md)
-- [AGENTS.md](./AGENTS.md)
-- [docs/ai/L1/02_architecture.md](./docs/ai/L1/02_architecture.md) — full-stack topology and lifecycle
-- [docs/ai/L1/03_code_map.md](./docs/ai/L1/03_code_map.md) — curated `web/` + `server/` file map
+This recipe is derived from
+[`agent-quickstart-python`](https://github.com/AgoraIO-Conversational-AI/agent-quickstart-python).
+See [UPSTREAM.md](./UPSTREAM.md) for the pinned base and sync policy.
 
 ## License
 

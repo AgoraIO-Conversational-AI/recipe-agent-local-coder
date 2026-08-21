@@ -1,4 +1,4 @@
-# recipe-agent-local-coder (python) — Repo Card
+# recipe-agent-voice-coder (python) — Repo Card
 
 > Next.js web client + Python FastAPI backend for an Agora Conversational AI voice agent, with a local Codex ACP runtime and authenticated Managed Voice LLM MCP ingress.
 
@@ -6,10 +6,10 @@
 
 | Field         | Value                                                                |
 | ------------- | -------------------------------------------------------------------- |
-| Repo          | `AgoraIO-Conversational-AI/recipe-agent-local-coder`                 |
+| Repo          | `AgoraIO-Conversational-AI/recipe-agent-voice-coder`                 |
 | Type          | `distributed-system` (single repo, two co-located processes)         |
 | Language      | Python 3.10+ (FastAPI + uvicorn) backend + Next.js 16 / React 19 web  |
-| Deploy Target | `web/` as Next.js app, `server/` as a reachable FastAPI service      |
+| Deploy Target | macOS local runtime; no supported remote Voice Coder deployment       |
 | Owner         | Agora Conversational AI DevEx                                        |
 | Last Reviewed | 2026-08-20                                                           |
 | Recipe Role   | `acp-local`                                                          |
