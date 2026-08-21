@@ -1,6 +1,6 @@
 import { expect, test } from 'bun:test'
 
-import { getRuntimeStartBlock } from './local-runtime'
+import { getPreCallLocalAction, getRuntimeStartBlock } from './local-runtime'
 import type { LocalRuntimeStatus, WorkspaceStatus } from './workspace'
 
 const savedWorkspace: WorkspaceStatus = {
@@ -43,4 +43,31 @@ test('runtime readiness blocks every non-ready state with useful guidance', () =
   )
   expect(getRuntimeStartBlock(savedWorkspace, null)).toBe('Checking local Codex runtime readiness.')
   expect(getRuntimeStartBlock(savedWorkspace, runtime('ready'))).toBeNull()
+})
+
+test('unknown local setup is checking rather than an error', () => {
+  expect(getPreCallLocalAction(true, null, null, true)).toEqual({
+    kind: 'checking',
+    label: 'Checking local setup…',
+    disabled: true,
+    ready: false,
+  })
+})
+
+test('missing Workspace routes the primary action to configuration', () => {
+  expect(getPreCallLocalAction(true, null, null, false)).toEqual({
+    kind: 'configure',
+    label: 'Choose Project Folder',
+    disabled: false,
+    ready: false,
+  })
+})
+
+test('ready Workspace and runtime enable conversation start', () => {
+  expect(getPreCallLocalAction(true, savedWorkspace, runtime('ready'), false)).toEqual({
+    kind: 'start',
+    label: 'Start Conversation',
+    disabled: false,
+    ready: true,
+  })
 })
