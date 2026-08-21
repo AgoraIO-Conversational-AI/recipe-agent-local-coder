@@ -121,6 +121,9 @@ If you need real auth, add a FastAPI dependency that validates a header on each 
   pending request without granting access.
 - Work receipts, safe activity, bounded results, and permission decisions are
   persisted in a mode-`0600` SQLite file under a mode-`0700` state directory.
+  These exact mode-bit guarantees apply on POSIX hosts, including the supported
+  macOS runtime. Windows CI exercises persistence behavior but does not assert
+  POSIX permission bits because Windows does not provide those semantics.
   Raw ACP frames, thought content, authentication data, child environments,
   and private protocol identifiers are not stored.
 - A targeted Work receipt privately persists its originating Agora Agent ID so

@@ -6,7 +6,7 @@ import json
 import os
 import sqlite3
 import uuid
-from datetime import UTC, datetime
+from datetime import datetime, timezone
 from pathlib import Path
 
 from .models import (
@@ -37,7 +37,11 @@ _STATE_ACTIVITY: dict[WorkState, tuple[str, str]] = {
 
 
 def _now() -> str:
-    return datetime.now(UTC).isoformat(timespec="milliseconds").replace("+00:00", "Z")
+    return (
+        datetime.now(timezone.utc)
+        .isoformat(timespec="milliseconds")
+        .replace("+00:00", "Z")
+    )
 
 
 def _bounded(value: str, *, name: str, max_bytes: int) -> str:

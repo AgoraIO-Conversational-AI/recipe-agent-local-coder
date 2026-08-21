@@ -1,5 +1,6 @@
 """Durable Work Store behavior through its public interface."""
 
+import os
 import sqlite3
 import stat
 
@@ -297,8 +298,9 @@ def test_database_reopens_with_private_permissions(tmp_path):
     reopened = WorkStore(path)
     try:
         assert reopened.get(receipt.work_id) == receipt
-        assert stat.S_IMODE(path.stat().st_mode) == 0o600
-        assert stat.S_IMODE(path.parent.stat().st_mode) == 0o700
+        if os.name == "posix":
+            assert stat.S_IMODE(path.stat().st_mode) == 0o600
+            assert stat.S_IMODE(path.parent.stat().st_mode) == 0o700
     finally:
         reopened.close()
 

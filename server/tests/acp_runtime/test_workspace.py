@@ -1,6 +1,7 @@
 """Workspace Scope persistence tests through the public service API."""
 
 import json
+import os
 import stat
 
 import pytest
@@ -40,7 +41,8 @@ def test_select_resolves_and_persists_one_primary_directory(tmp_path):
         "label": "project",
         "primary_directory": str(project.resolve()),
     }
-    assert stat.S_IMODE(store.path.stat().st_mode) == 0o600
+    if os.name == "posix":
+        assert stat.S_IMODE(store.path.stat().st_mode) == 0o600
 
 
 def test_missing_saved_directory_reports_invalid_without_deleting_record(tmp_path):
