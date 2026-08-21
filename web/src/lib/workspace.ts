@@ -28,9 +28,7 @@ export interface BrowseOperationStatus {
   error?: string | null
 }
 
-export type BrowseWorkspaceOutcome =
-  | { state: 'ready'; workspace: WorkspaceStatus }
-  | { state: 'cancelled' }
+export type BrowseWorkspaceOutcome = { state: 'ready'; workspace: WorkspaceStatus } | { state: 'cancelled' }
 
 export type LocalRuntimeState = 'configuration_required' | 'starting' | 'authentication_required' | 'ready' | 'failed'
 

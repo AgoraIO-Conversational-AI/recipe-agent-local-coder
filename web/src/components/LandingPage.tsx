@@ -10,7 +10,7 @@ import { LoadingSkeleton } from '@/components/LoadingSkeleton'
 import { ProjectFolderSettings } from '@/components/ProjectFolderSettings'
 import { QuickstartPreCallCard } from '@/components/QuickstartPreCallCard'
 import { ShareButton } from '@/components/share-button'
-import { getRuntimeStartBlock } from '@/lib/local-runtime'
+import { getPreCallLocalAction } from '@/lib/local-runtime'
 import type { LocalRuntimeStatus, WorkspaceStatus } from '@/lib/workspace'
 import { workspaceNeedsConfiguration } from '@/lib/workspace'
 import { getConfig, getWorkspace, startAgent, startLocalRuntime, stopAgent } from '@/services/api'
@@ -84,6 +84,9 @@ export default function LandingPage() {
   const [workspaceError, setWorkspaceError] = useState<string | null>(null)
   const [runtimeStatus, setRuntimeStatus] = useState<LocalRuntimeStatus | null>(null)
   const [settingsOpen, setSettingsOpen] = useState(false)
+  const [localSetupChecking, setLocalSetupChecking] = useState(localRuntimeEnabled)
+  const startConversationRef = useRef<HTMLButtonElement>(null)
+  const localAction = getPreCallLocalAction(localRuntimeEnabled, workspaceStatus, runtimeStatus, localSetupChecking)
 
   useEffect(() => {
     import('agora-rtc-react').catch(() => {})
@@ -107,13 +110,20 @@ export default function LandingPage() {
         const runtime = await startLocalRuntime()
         if (cancelled) return
         setRuntimeStatus(runtime)
-        setError(getRuntimeStartBlock(status, runtime))
+        if (runtime.state === 'ready') {
+          setWorkspaceError(null)
+          setError(null)
+        } else {
+          setWorkspaceError(runtime.error ?? 'Could not finish local setup. Try again.')
+          setSettingsOpen(true)
+        }
       } catch (nextError) {
         if (cancelled) return
         const message = nextError instanceof Error ? nextError.message : 'Could not load local Codex runtime readiness'
         setWorkspaceError(message)
-        setError(message)
         setSettingsOpen(true)
+      } finally {
+        if (!cancelled) setLocalSetupChecking(false)
       }
     }
     void loadReadiness()
@@ -124,15 +134,8 @@ export default function LandingPage() {
 
   const handleStartConversation = async () => {
     if (localRuntimeEnabled) {
-      const runtimeBlock = getRuntimeStartBlock(workspaceStatus, runtimeStatus)
-      if (runtimeBlock) {
-        setError(runtimeBlock)
-        if (!workspaceStatus || workspaceNeedsConfiguration(workspaceStatus)) {
-          setSettingsOpen(true)
-        }
-        return
-      }
-      if (!workspaceStatus || workspaceNeedsConfiguration(workspaceStatus)) {
+      if (localAction.kind === 'checking') return
+      if (localAction.kind === 'configure') {
         setSettingsOpen(true)
         return
       }
@@ -239,6 +242,10 @@ export default function LandingPage() {
             <QuickstartPreCallCard
               isLoading={isLoading}
               error={error}
+              primaryLabel={localAction.label}
+              primaryDisabled={localAction.disabled}
+              workspaceReady={localAction.ready}
+              primaryButtonRef={startConversationRef}
               onStartConversation={handleStartConversation}
               onOpenSettings={localRuntimeEnabled ? () => setSettingsOpen(true) : undefined}
             />
@@ -306,11 +313,15 @@ export default function LandingPage() {
           onStatusChange={(status) => {
             setWorkspaceStatus(status)
             setWorkspaceError(null)
-            if (!workspaceNeedsConfiguration(status)) setSettingsOpen(false)
+            setError(null)
+            if (!workspaceNeedsConfiguration(status)) {
+              setSettingsOpen(false)
+              requestAnimationFrame(() => startConversationRef.current?.focus())
+            }
           }}
           onRuntimeStatusChange={setRuntimeStatus}
           onClose={() => {
-            if (!getRuntimeStartBlock(workspaceStatus, runtimeStatus)) {
+            if (localAction.kind === 'start') {
               setSettingsOpen(false)
             }
           }}

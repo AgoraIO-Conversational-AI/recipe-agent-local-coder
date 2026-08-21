@@ -232,9 +232,7 @@ test('browseWorkspace preserves an actionable failed operation message', async (
     },
   ])
 
-  await expect(browseWorkspace({ pollIntervalMs: 0 })).rejects.toThrow(
-    'Could not start the local Codex runtime',
-  )
+  await expect(browseWorkspace({ pollIntervalMs: 0 })).rejects.toThrow('Could not start the local Codex runtime')
 })
 
 test('selectWorkspace sends the advanced manual path', async () => {

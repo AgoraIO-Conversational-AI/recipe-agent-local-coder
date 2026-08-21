@@ -1,4 +1,9 @@
-import type { BrowseOperationStatus, BrowseWorkspaceOutcome, LocalRuntimeStatus, WorkspaceStatus } from '@/lib/workspace'
+import type {
+  BrowseOperationStatus,
+  BrowseWorkspaceOutcome,
+  LocalRuntimeStatus,
+  WorkspaceStatus,
+} from '@/lib/workspace'
 
 const API_BASE_URL = '/api'
 

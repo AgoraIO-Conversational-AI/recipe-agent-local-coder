@@ -1,12 +1,17 @@
 'use client'
 
 import { Loader2, Settings2 } from 'lucide-react'
+import type { Ref } from 'react'
 
 import { Button } from '@/components/ui/button'
 
 type QuickstartPreCallCardProps = {
   isLoading: boolean
   error: string | null
+  primaryLabel: string
+  primaryDisabled: boolean
+  workspaceReady: boolean
+  primaryButtonRef?: Ref<HTMLButtonElement>
   onStartConversation: () => void
   onOpenSettings?: () => void
 }
@@ -14,6 +19,10 @@ type QuickstartPreCallCardProps = {
 export function QuickstartPreCallCard({
   isLoading,
   error,
+  primaryLabel,
+  primaryDisabled,
+  workspaceReady,
+  primaryButtonRef,
   onStartConversation,
   onOpenSettings,
 }: QuickstartPreCallCardProps) {
@@ -41,11 +50,19 @@ export function QuickstartPreCallCard({
         Built on Agora&apos;s flagship Conversational AI engine, for effortless agentic conversations.
       </p>
 
+      {workspaceReady ? (
+        <p className="mt-7 flex items-center gap-2 text-xs font-medium text-emerald-400">
+          <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 shadow-[0_0_0_4px_rgba(52,211,153,0.1)]" />
+          Project Folder ready
+        </p>
+      ) : null}
+
       <Button
+        ref={primaryButtonRef}
         onClick={onStartConversation}
-        disabled={isLoading}
-        className="mt-12 h-10 w-full rounded-lg border border-primary bg-primary text-sm font-medium text-black transition-transform duration-150 hover:border-white hover:bg-white hover:text-black active:scale-[0.96] disabled:hover:border-primary disabled:hover:bg-primary disabled:hover:text-black"
-        aria-label={isLoading ? 'Starting conversation with AI agent' : 'Start conversation with AI agent'}
+        disabled={isLoading || primaryDisabled}
+        className={`${workspaceReady ? 'mt-6' : 'mt-12'} h-11 w-full rounded-lg border border-primary bg-primary text-sm font-medium text-black transition-transform duration-150 hover:border-white hover:bg-white hover:text-black active:scale-[0.96] disabled:hover:border-primary disabled:hover:bg-primary disabled:hover:text-black`}
+        aria-label={isLoading ? 'Starting conversation with AI agent' : primaryLabel}
       >
         {isLoading ? (
           <>
@@ -53,7 +70,7 @@ export function QuickstartPreCallCard({
             Starting...
           </>
         ) : (
-          'Start Conversation'
+          primaryLabel
         )}
       </Button>
       {error ? <p className="mt-3 text-xs text-destructive">{error}</p> : null}

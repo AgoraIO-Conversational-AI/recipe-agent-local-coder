@@ -2,7 +2,7 @@ import { expect, test } from 'bun:test'
 
 import { getRuntimeStartBlock } from './local-runtime'
 import type { LocalRuntimeStatus, WorkspaceStatus } from './workspace'
-import { selectWorkspaceWithRuntimeRefresh } from './workspace-selection'
+import { applyBrowseOutcomeWithRuntimeRefresh, selectWorkspaceWithRuntimeRefresh } from './workspace-selection'
 
 const workspace: WorkspaceStatus = {
   state: 'ready',
@@ -40,4 +40,22 @@ test('failed replacement invalidates stale ready runtime before Start Conversati
   if (!block) agoraCalls += 1
   expect(block).toContain('missing executable')
   expect(agoraCalls).toBe(0)
+})
+
+test('cancelled browse is silent and does not refresh runtime', async () => {
+  let runtimeCalls = 0
+  const published: Array<LocalRuntimeStatus | null> = []
+
+  const outcome = await applyBrowseOutcomeWithRuntimeRefresh(
+    async () => ({ state: 'cancelled' }),
+    async () => {
+      runtimeCalls += 1
+      throw new Error('must not run')
+    },
+    (runtime) => published.push(runtime),
+  )
+
+  expect(outcome).toEqual({ state: 'cancelled' })
+  expect(runtimeCalls).toBe(0)
+  expect(published).toEqual([])
 })
