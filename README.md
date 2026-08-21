@@ -51,9 +51,11 @@ ngrok config add-authtoken <your-token>
 bun run dev:codex
 ```
 
-Open [http://127.0.0.1:3000](http://127.0.0.1:3000). On first launch, select an
-existing **Project Folder**, then start a conversation and ask for an outcome in
-natural language. Starting a conversation uses Agora minutes; setup and offline
+Open [http://127.0.0.1:3000](http://127.0.0.1:3000). On first launch, Project
+Folder Settings opens automatically. Select an existing **Project Folder**;
+successful local setup closes Settings and enables **Start Conversation**
+without another confirmation. Cancelling the macOS picker simply returns to
+Settings. Starting a conversation uses Agora minutes; setup and offline
 verification do not.
 
 The first Codex request reuses existing credentials when possible. If Codex ACP
@@ -212,7 +214,7 @@ lifecycle.
 | --- | --- |
 | Setup or credentials are incomplete | Run `bun run doctor:local` and `bun run preflight:codex`. |
 | Agent greets but does not start Work | Confirm ngrok is authenticated, then restart and check that the selected Project Folder reports ready. |
-| Project Folder settings remain open | Select an existing directory; the folder is validated by the local backend. |
+| Project Folder settings remain open | Follow the actionable message in Settings and use **Try Again**. Missing configuration and picker cancellation are not errors. |
 | Codex requests authentication | Complete the advertised ChatGPT flow, or configure a supported child-process API key. |
 | Port 3000 is already in use | Stop the exact process using that port, then run `bun run dev:codex` again. |
 | A previous terminal closed unexpectedly | Restart the launcher; interrupted nonterminal Work is marked failed rather than silently resumed. |

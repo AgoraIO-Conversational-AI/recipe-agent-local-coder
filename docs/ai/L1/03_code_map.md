@@ -19,13 +19,13 @@ web/                      # Next.js 16 app (workspace member)
     page.tsx              # Renders <LandingPage />
   src/
     components/
-      LandingPage.tsx
+      LandingPage.tsx       # local setup checking gate + ready focus handoff
       ConversationComponent.tsx
       QuickstartConversationLayout.tsx
       QuickstartTranscriptPanel.tsx
       QuickstartPipelineMetrics.tsx
-      QuickstartPreCallCard.tsx
-      ProjectFolderSettings.tsx  # blocking local Codex Project Folder gate
+      QuickstartPreCallCard.tsx   # setup-aware primary action + ready status
+      ProjectFolderSettings.tsx  # blocking selection/cancellation/failure UI
       ConnectionStatusPanel.tsx
       ConversationErrorCard.tsx
       MicrophoneSelector.tsx

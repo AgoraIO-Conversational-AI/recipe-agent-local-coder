@@ -40,7 +40,13 @@ Browser Settings gate
 
 The browser opens Settings automatically when the Codex profile has no valid
 Project Folder. The native macOS picker is invoked by the loopback backend, not
-the browser. The selected resolved directory is persisted in
+the browser. Picker cancellation returns to the blocking Settings gate without
+an error. A successful selection activates ACP, closes Settings automatically,
+and focuses **Start Conversation**; bounded activation failures remain in
+Settings with a retry action instead of being collapsed into a folder-selection
+error. `LandingPage` owns the initial checking gate and focus handoff, while
+`ProjectFolderSettings` owns selection, cancellation, and failure presentation.
+The selected resolved directory is persisted in
 `~/Library/Application Support/Agora Voice ACP/workspace.json` by default (or
 under `VOICE_ACP_STATE_DIR`). The Project Folder is session context, not a
 filesystem sandbox.

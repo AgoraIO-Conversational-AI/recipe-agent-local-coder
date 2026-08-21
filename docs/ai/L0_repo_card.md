@@ -38,7 +38,10 @@ This repository also carries a local-only Codex foundation for a downstream
 voice-to-work derivative. Its asynchronous Project Folder picker, supervised
 local process lifecycle, ACP lifecycle, SQLite-backed Task Runtime Core, and
 `/api/local/*` routes are extension contracts, not part of the reusable
-three-route quickstart baseline. The derivative owns an isolated four-tool MCP
+three-route quickstart baseline. Missing configuration opens a guided Settings
+gate, cancellation is silent, ready setup returns directly to **Start
+Conversation**, and bounded activation failures remain actionable. The
+derivative owns an isolated four-tool MCP
 listener and a launcher-owned, current-ngrok-compatible tunnel. Pending
 capabilities permit MCP discovery only; Work calls require exact Agent binding.
 The Managed Work prompt treats the selected Project Folder and registered tools

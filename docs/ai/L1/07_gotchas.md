@@ -19,6 +19,15 @@ for one session. It does not restrict child-process filesystem access. The
 default state file is `~/Library/Application Support/Agora Voice ACP/workspace.json`;
 `VOICE_ACP_STATE_DIR` changes only the parent state directory.
 
+## Picker Success Includes ACP Activation
+
+The asynchronous picker does not report `ready` immediately after the macOS
+dialog returns. Its selection first passes Workspace validation and local ACP
+activation. Native cancellation is a normal terminal state and must not be
+rendered as an error. Activation failure must preserve the existing bounded
+runtime or switch-guard reason; collapsing it to **Could not select the Project
+Folder** sends the user to the wrong recovery action.
+
 ## Offline ACP Coverage Is Not Live Acceptance
 
 Fake ACP tests prove the client boundary, readiness serialization, loopback

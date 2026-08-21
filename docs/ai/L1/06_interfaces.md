@@ -68,7 +68,7 @@ Successful `/local/*` responses use
 | --- | --- | --- |
 | `403` | Caller is not loopback | `{ "detail": "..." }` |
 | `400` | `PUT` path is not an absolute existing directory | `{ "detail": "Project Folder must be an absolute existing directory" }` |
-| `409` | Picker cancellation or a Workspace switch guard conflict | `{ "detail": "..." }` |
+| `409` | A picker is already active or a Workspace switch guard blocks replacement | `{ "detail": "..." }` |
 | `503` | Candidate folder could not activate the local ACP runtime | `{ "detail": "..." }` |
 
 FastAPI also returns its normal validation error body for an invalid request
@@ -82,6 +82,13 @@ absolute directory. `GET /local/runtime` is read-only; `POST /local/runtime`
 explicitly activates a valid saved Workspace. `LocalRuntimeStatus` uses
 `configuration_required`, `starting`, `authentication_required`, `ready`, or
 `failed`, plus `workspace` and an optional safe `error`.
+
+The asynchronous browse operation reports `picking`, `ready`, `cancelled`, or
+`failed` inside successful envelopes. The browser helper maps terminal
+`cancelled` to the typed non-error `{ state: "cancelled" }` outcome. Terminal
+`failed` preserves the bounded Workspace validation, switch-guard, or runtime
+readiness reason and rejects in the browser; it never returns raw child or
+protocol errors.
 
 The default ACP command is pinned to `npx -y @agentclientprotocol/codex-acp@1.1.7`
 with `INITIAL_AGENT_MODE=agent`. It tries `new_session` with reusable credentials
