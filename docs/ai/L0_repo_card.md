@@ -11,7 +11,7 @@
 | Language      | Python 3.10+ (FastAPI + uvicorn) backend + Next.js 16 / React 19 web  |
 | Deploy Target | macOS local runtime; no supported remote Voice Coder deployment       |
 | Owner         | Agora Conversational AI DevEx                                        |
-| Last Reviewed | 2026-08-20                                                           |
+| Last Reviewed | 2026-08-21                                                           |
 | Recipe Role   | `acp-local`                                                          |
 | Base Recipe   | `agent-quickstart-python` @ `1.0.0`                                  |
 | Recipe Version | `0.1.0`                                                             |

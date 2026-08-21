@@ -181,7 +181,8 @@ The web client owns RTC/RTM and the visible conversation. FastAPI owns Agora
 tokens, Agent lifecycle, Workspace settings, the Task Runtime, and the private
 MCP listener. The launcher owns the frontend, backend, ngrok, native picker,
 and ACP child-process lifecycle so one shutdown cleans up the complete local
-process group.
+process group. It gives children a graceful SIGTERM shutdown while preserving
+the terminal-facing exit status, including `130` for Ctrl-C.
 
 The selected Project Folder is persisted at
 `~/Library/Application Support/Agora Voice ACP/workspace.json` unless

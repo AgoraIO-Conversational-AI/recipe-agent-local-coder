@@ -131,8 +131,9 @@ What it does:
 2. Starts the launcher only with injected harmless shell stubs through
    `LOCAL_BACKEND_COMMAND` and `LOCAL_FRONTEND_COMMAND`.
 3. Proves a failing child returns failure and terminates its sibling.
-4. Proves terminal SIGINT, SIGTERM, and SIGHUP reach each child exactly once
-   with the stable `130`, `143`, and `129` launcher statuses.
+4. Proves terminal SIGINT, SIGTERM, and SIGHUP stop each child exactly once via
+   SIGTERM with the stable `130`, `143`, and `129` launcher statuses. A real
+   Python sleeper guards against interrupt tracebacks.
 5. Proves one duplicate SIGINT burst stays graceful, while a later deliberate
    Ctrl-C or a shortened test deadline returns `137` and removes
    signal-ignoring children. Normal root completion removes residual

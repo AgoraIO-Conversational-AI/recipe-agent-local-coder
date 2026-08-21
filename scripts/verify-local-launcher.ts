@@ -334,9 +334,58 @@ for (const signal of ["SIGINT", "SIGTERM"] as const) {
 	}
 }
 
-await verifyOwnedTerminalSignal("SIGINT", "SIGINT", 130);
+await verifyOwnedTerminalSignal("SIGINT", "SIGTERM", 130);
 await verifyOwnedTerminalSignal("SIGTERM", "SIGTERM", 143);
 await verifyOwnedTerminalSignal("SIGHUP", "SIGTERM", 129);
+
+const quietPythonInterruptDirectory = mkdtempSync(
+	path.join(tmpdir(), "voice-acp-launcher-quiet-python-interrupt-"),
+);
+try {
+	const backendPidPath = path.join(
+		quietPythonInterruptDirectory,
+		"backend.pid",
+	);
+	const frontendPidPath = path.join(
+		quietPythonInterruptDirectory,
+		"frontend.pid",
+	);
+	const frontendSignals = path.join(
+		quietPythonInterruptDirectory,
+		"frontend.signals",
+	);
+	const pythonProgram = [
+		"import os",
+		"import time",
+		`open(${JSON.stringify(backendPidPath)}, "w").write(str(os.getpid()))`,
+		"time.sleep(60)",
+	].join(";");
+	const encodedPythonProgram = Buffer.from(pythonProgram).toString("base64");
+	const launcherProcess = startTerminalLauncher(
+		`exec ${python3} -c 'import base64;exec(base64.b64decode("${encodedPythonProgram}"))'`,
+		recordingChildCommand(frontendPidPath, frontendSignals),
+	);
+	const [backendPid, frontendPid] = await Promise.all([
+		waitForPid(backendPidPath),
+		waitForPid(frontendPidPath),
+	]);
+
+	process.kill(-launcherProcess.pid, "SIGINT");
+	const result = await launcherProcess.exited;
+
+	assert(
+		result.code === 130 && result.signal === null,
+		`terminal SIGINT should retain status 130; received code=${result.code} signal=${result.signal}`,
+	);
+	assert(
+		!result.output.includes("Traceback") &&
+			!result.output.includes("KeyboardInterrupt"),
+		"terminal SIGINT should stop a Python backend without an interrupt traceback",
+	);
+	await Promise.all([waitForExit(backendPid), waitForExit(frontendPid)]);
+} finally {
+	rmSync(quietPythonInterruptDirectory, { recursive: true, force: true });
+}
 
 const duplicateBurstDirectory = mkdtempSync(
 	path.join(tmpdir(), "voice-acp-launcher-duplicate-burst-"),
@@ -369,12 +418,12 @@ try {
 		`one terminal interrupt burst should remain graceful and return 130; received code=${result.code} signal=${result.signal}`,
 	);
 	assert(
-		readFileSync(backendSignals, "utf8").trim() === "SIGINT",
-		"a duplicate terminal burst should reach the backend once",
+		readFileSync(backendSignals, "utf8").trim() === "SIGTERM",
+		"a duplicate terminal burst should stop the backend once",
 	);
 	assert(
-		readFileSync(frontendSignals, "utf8").trim() === "SIGINT",
-		"a duplicate terminal burst should reach the frontend once",
+		readFileSync(frontendSignals, "utf8").trim() === "SIGTERM",
+		"a duplicate terminal burst should stop the frontend once",
 	);
 	await Promise.all([waitForExit(backendPid), waitForExit(frontendPid)]);
 } finally {
@@ -404,8 +453,8 @@ try {
 
 	process.kill(-launcherProcess.pid, "SIGINT");
 	await Promise.all([
-		waitForSignal(backendSignals, "SIGINT"),
-		waitForSignal(frontendSignals, "SIGINT"),
+		waitForSignal(backendSignals, "SIGTERM"),
+		waitForSignal(frontendSignals, "SIGTERM"),
 	]);
 	await Bun.sleep(600);
 	process.kill(-launcherProcess.pid, "SIGINT");

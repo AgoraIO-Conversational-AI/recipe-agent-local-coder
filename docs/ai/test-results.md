@@ -103,3 +103,19 @@ not open the native picker, start ngrok, call Agora, or consume Agora minutes.
 | Successful setup handoff | Pass | The dialog closed and focus moved to **Start Conversation** after a mocked ready outcome. |
 | Narrow layout | Pass | At 390 by 844 pixels, neither the document nor dialog overflowed horizontally. |
 | Browser errors | Pass | No new page errors were observed; the existing Agora logo aspect-ratio development warning remains unrelated. |
+
+## 2026-08-21 Real macOS Local Runtime Acceptance
+
+This acceptance used the real `bun run dev:codex` entry point, macOS folder
+picker, and Codex ACP child process. It did not click **Start Conversation**,
+start ngrok, create an Agora Agent, or consume Agora minutes.
+
+| Check | Result | Evidence |
+| ----- | ------ | -------- |
+| Native folder selection | Pass | The `202 + operation_id` flow completed `ready` for `/Users/zhangqianze/Documents/recipe-agent-voice-coder`. |
+| Persisted Workspace | Pass | `GET /local/workspace` returned the selected resolved directory and Codex profile. |
+| Codex readiness and cwd | Pass | `POST /local/runtime` returned `ready`; the live `codex-acp` process cwd matched the selected Project Folder. No additional login was required on this machine. |
+| Agora cost boundary | Pass | Browser network history contained no `/api/startAgent` request, port 4040 remained closed, and no Agora Agent was created. |
+| One-command cold start | Pass | From closed ports, `bun run dev:codex` completed preflight and started Next, FastAPI, and the local Codex runtime. |
+| Quiet Ctrl-C | Pass after fix | The initial live run exposed Python interrupt tracebacks. The supervisor now sends child SIGTERM while retaining launcher status `130`; the same live flow exited without traceback. |
+| Residual cleanup | Pass | After shutdown, ports 3000, 8000, and 4040 were closed and no supervisor, Next, `concurrently`, or `codex-acp` process remained. |

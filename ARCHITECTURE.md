@@ -92,6 +92,9 @@ ID, Workspace ID, and Workspace generation. Agent stop revokes it first. The
 MCP listener exposes only four Work tools and is never mounted into the
 lifecycle FastAPI app. ngrok starts lazily when an Agent is prepared after ACP
 readiness and remains in the launcher's process group for forced cleanup.
+The Local Launcher Supervisor converts the first terminal shutdown request to
+child SIGTERM so Python and web children exit quietly, while its own status
+continues to distinguish SIGINT (`130`), SIGTERM (`143`), and SIGHUP (`129`).
 
 Agora may initialize and discover MCP tools before Agent creation returns the
 real Agent ID. The prepared bearer permits only that side-effect-free handshake;

@@ -112,11 +112,10 @@ def supervise(
         deadline: float | None = None
         while root.poll() is None:
             if received_signal is not None and not forwarded:
-                forwarded_signal = (
-                    signal.SIGTERM
-                    if received_signal == signal.SIGHUP
-                    else received_signal
-                )
+                # Child processes need graceful shutdown semantics even when the
+                # terminal gesture was Ctrl-C. The supervisor preserves the
+                # user's signal in its own exit code below.
+                forwarded_signal = signal.SIGTERM
                 try:
                     root.send_signal(forwarded_signal)
                 except ProcessLookupError:

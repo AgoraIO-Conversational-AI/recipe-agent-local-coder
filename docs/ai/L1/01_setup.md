@@ -125,10 +125,12 @@ bun run validate:managed       # optional interactive Managed evidence run; uses
 `cd web && bun run doctor` separately enforces `AGENT_BACKEND_URL` validity.
 
 `bun run dev:codex` replaces its argument-parsing shell with the Local Launcher
-Supervisor before starting `concurrently`. One Ctrl-C is graceful; a second
-deliberate Ctrl-C or the 10-second deadline force-cleans the isolated process
-group. Terminal closure is handled as SIGHUP cleanup. Interrupted statuses are
-`130` (SIGINT), `143` (SIGTERM), `129` (SIGHUP), and `137` (forced cleanup).
+Supervisor before starting `concurrently`. The first terminal signal becomes
+child SIGTERM for quiet graceful shutdown, while the supervisor preserves the
+terminal-facing status. A second deliberate Ctrl-C or the 10-second deadline
+force-cleans the isolated process group. Terminal closure is handled as SIGHUP
+cleanup. Interrupted statuses are `130` (SIGINT), `143` (SIGTERM), `129`
+(SIGHUP), and `137` (forced cleanup).
 `LOCAL_LAUNCHER_GRACE_SECONDS` is a verification-only seam.
 
 ## Verification Safety
