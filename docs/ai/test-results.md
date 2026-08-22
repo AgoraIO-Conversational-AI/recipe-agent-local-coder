@@ -119,3 +119,20 @@ start ngrok, create an Agora Agent, or consume Agora minutes.
 | One-command cold start | Pass | From closed ports, `bun run dev:codex` completed preflight and started Next, FastAPI, and the local Codex runtime. |
 | Quiet Ctrl-C | Pass after fix | The initial live run exposed Python interrupt tracebacks. The supervisor now sends child SIGTERM while retaining launcher status `130`; the same live flow exited without traceback. |
 | Residual cleanup | Pass | After shutdown, ports 3000, 8000, and 4040 were closed and no supervisor, Next, `concurrently`, or `codex-acp` process remained. |
+
+## 2026-08-22 Controlled Voice E2E Attempt
+
+One explicitly authorized Agora conversation used a local prerecorded fake
+microphone input. The attempt was stopped without retrying when the input did
+not produce a user transcript.
+
+| Check | Result | Evidence |
+| ----- | ------ | -------- |
+| Agent lifecycle | Pass | The live Agent joined the RTC channel, the client reported connected, and `POST /api/stopAgent` returned 200. |
+| Managed MCP discovery | Pass | The public tunnel became available and the backend processed the authenticated `ListToolsRequest` handshake. |
+| Greeting delivery | Pass | The transcript received the Agent greeting, **Voice coding is ready.** |
+| Synthetic microphone input | Failed | Agora reported `AUDIO_INPUT_LEVEL_TOO_LOW`; the prerecorded request never appeared as a user transcript. |
+| Voice to Work routing | Not proven | No new Work receipt was created, so this attempt does not prove Managed LLM tool selection, MCP `start_work`, or Codex execution. |
+| Completion notification | Not proven | Without a Work receipt, proactive completion delivery could not run. |
+| Cost containment | Pass | Exactly one conversation was created; the failed input was not retried. |
+| Cleanup | Pass | The Agent leave request succeeded; after launcher shutdown, ports 3000, 8000, and 4040 were closed with no related process remaining. |
